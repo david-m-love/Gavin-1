@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>FOOD FUN — Jeff the Sumo</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #10131f;
+    font-family: "Trebuchet MS", "Hiragino Maru Gothic ProN", Verdana, sans-serif;
+    color: #fff;
+    touch-action: none;
+    user-select: none;
+  }
+  #wrap {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  canvas {
+    display: block;
+    background: #0b0e18;
+    image-rendering: auto;
+    border-radius: 10px;
+    box-shadow: 0 0 0 3px #ff5f7e, 0 12px 50px rgba(0,0,0,.7);
+    max-width: 100%; max-height: 100%;
+  }
+
+  /* ---- touch controls ---- */
+  #touch { position: fixed; inset: 0; pointer-events: none; display: none; }
+  body.touch #touch { display: block; }
+  .pad {
+    position: absolute; bottom: 14px;
+    display: flex; gap: 12px; pointer-events: auto;
+  }
+  #padL { left: 14px; }
+  #padR { right: 14px; }
+  .btn {
+    width: 78px; height: 78px; border-radius: 50%;
+    background: rgba(255,255,255,.14);
+    border: 3px solid rgba(255,255,255,.5);
+    color: #fff; font-size: 26px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; line-height: 1;
+    backdrop-filter: blur(4px);
+  }
+  .btn small { font-size: 10px; opacity: .85; margin-top: 3px; letter-spacing: .5px; }
+  .btn.down { background: rgba(255,255,255,.42); transform: scale(.94); }
+  #bJump { background: rgba(120,225,140,.22); border-color: rgba(150,255,170,.75); }
+  #bSlurp { background: rgba(120,190,255,.22); border-color: rgba(150,210,255,.75); }
+  #bBump { background: rgba(255,150,90,.22); border-color: rgba(255,180,120,.75); }
+
+  /* ---- mute ---- */
+  #mute {
+    position: fixed; top: 12px; right: 12px; z-index: 5;
+    width: 46px; height: 46px; border-radius: 50%;
+    background: rgba(0,0,0,.45); border: 2px solid rgba(255,255,255,.4);
+    color: #fff; font-size: 20px; pointer-events: auto;
+  }
+</style>
+</head>
+<body>
+  <div id="wrap"><canvas id="game" width="960" height="540"></canvas></div>
+
+  <div id="touch">
+    <div class="pad" id="padL">
+      <div class="btn" data-key="left">◀</div>
+      <div class="btn" data-key="right">▶</div>
+    </div>
+    <div class="pad" id="padR">
+      <div class="btn" id="bSlurp" data-key="slurp">🌀<small>SLURP</small></div>
+      <div class="btn" id="bBump"  data-key="bump">💥<small>BUMP</small></div>
+      <div class="btn" id="bJump"  data-key="jump">⬆<small>JUMP</small></div>
+    </div>
+  </div>
+
+  <button id="mute" title="Sound on/off">🔊</button>
+
+  <!-- Load order matters: helpers first, game loop last. -->
+  <script src="src/input.js"></script>
+  <script src="src/audio.js"></script>
+  <script src="src/draw.js"></script>
+  <script src="src/levels.js"></script>
+  <script src="src/shield.js"></script>
+  <script src="src/jeff.js"></script>
+  <script src="src/food.js"></script>
+  <script src="src/ninja.js"></script>
+  <script src="src/boss.js"></script>
+  <script src="src/game.js"></script>
+</body>
+</html>
