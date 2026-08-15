@@ -126,6 +126,36 @@ var FF = window.FF || (window.FF = {});
     FF.audio.startMusic(spec.music || 1);
   }
 
+  // ------------------------------------------------------------- best score
+  // Remembered in the browser, same as the character pick. Wrapped in try/catch
+  // because private browsing can make localStorage throw.
+  const BEST_KEY = 'foodfun.best';
+
+  function loadBest() {
+    try {
+      const raw = localStorage.getItem(BEST_KEY);
+      const b = raw && JSON.parse(raw);
+      if (!b || typeof b.level !== 'number') return null;
+      return {
+        level: Math.max(0, Math.min(FF.LEVELS.length - 1, b.level)),
+        chopsticks: Math.max(0, b.chopsticks || 0),
+        beaten: !!b.beaten,
+      };
+    } catch (e) { return null; }
+  }
+
+  let best = loadBest();
+
+  /** Keep the furthest level, the most chopsticks, and whether he's ever won. */
+  function recordBest(beaten) {
+    best = {
+      level: Math.max(best ? best.level : 0, G.levelIndex),
+      chopsticks: Math.max(best ? best.chopsticks : 0, G.chopsticks),
+      beaten: (best && best.beaten) || !!beaten,
+    };
+    try { localStorage.setItem(BEST_KEY, JSON.stringify(best)); } catch (e) { /* ignore */ }
+  }
+
   function startRun() {
     G.lives = 3;
     G.chopsticks = 0;
@@ -154,6 +184,7 @@ var FF = window.FF || (window.FF = {});
 
   // ------------------------------------------------------------- game over
   function startGameOver() {
+    recordBest(false);
     FF.audio.stopMusic();
     FF.audio.play('rumble');
     // Gavin's game over: Jeff's belly rumbles so loud the screen cracks apart.
@@ -231,8 +262,8 @@ var FF = window.FF || (window.FF = {});
       updateParticles(1);
       if (G.bannerT > 110) {
         const next = G.levelIndex + 1;
-        if (next >= FF.LEVELS.length) { G.state = 'victory'; G.bannerT = 0; }
-        else { G.jeff.grow(); loadLevel(next); G.state = 'play'; }
+        if (next >= FF.LEVELS.length) { recordBest(true); G.state = 'victory'; G.bannerT = 0; }
+        else { G.jeff.grow(); loadLevel(next); recordBest(false); G.state = 'play'; }
       }
       return;
     }
@@ -367,6 +398,7 @@ var FF = window.FF || (window.FF = {});
         FF.audio.play('win');
         FF.audio.stopMusic();
         G.boss = null;
+        recordBest(true);
         G.state = 'victory';
         G.bannerT = 0;
       } else {
@@ -762,6 +794,17 @@ var FF = window.FF || (window.FF = {});
     FF.drawBackground(ctx, 'neon', W, H, G.t * 0.35, G.t);
     ctx.fillStyle = 'rgba(6,4,16,.45)';
     ctx.fillRect(0, 0, W, H);
+
+    // best score so far — nothing shows on a first-ever visit
+    if (best) {
+      const line = best.beaten
+        ? '🏆 YOU BEAT THE DRAGON FRUIT BOSS!   🥢 ' + best.chopsticks + ' / ' + FF.LEVELS.length
+        : 'BEST: got to ' + FF.LEVELS[best.level].name + '   🥢 ' + best.chopsticks + ' / ' + FF.LEVELS.length;
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      const bw2 = Math.max(300, line.length * 9.4);
+      FF.rr(ctx, W / 2 - bw2 / 2, 28, bw2, 30, 15); ctx.fill();
+      FF.text(ctx, line, W / 2, 43, 17, best.beaten ? '#ffd60a' : '#9dffb0');
+    }
 
     // bobbing logo
     const bob = Math.sin(G.t * 0.05) * 8;

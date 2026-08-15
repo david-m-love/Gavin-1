@@ -22,12 +22,46 @@ pick is saved, so it's still there next time you play.
 
 ---
 
+## 🌐 Play it online
+
+**Live at:** _(paste the Vercel link here once it's deployed)_
+
+Send that link to anyone and they can play — computer, phone or tablet, no
+downloads.
+
+### Putting it on Vercel (about two minutes)
+
+The game is a plain static site — no build step, no server, no dependencies —
+so Vercel needs no configuration at all.
+
+1. Go to **[vercel.com](https://vercel.com)** → **Continue with GitHub**.
+   The free Hobby plan is fine, and it can deploy private repos.
+2. **Add New… → Project**.
+3. Find **`david-m-love/Gavin-1`** in the list. If it isn't there, click
+   *Adjust GitHub App Permissions* and give Vercel access to that repo.
+4. **Framework Preset: Other.** Leave *Build Command* and *Output Directory*
+   **empty** — there is nothing to build.
+5. **Deploy.** About twenty seconds later there's a live URL.
+6. Optional: **Settings → General → Project Name** → `food-fun`, which makes the
+   address `food-fun.vercel.app`.
+
+After that it's automatic: every push to the `claude/game-design-questions-oued56`
+branch redeploys the live site.
+
+---
+
 ## ▶️ How to play it
+
+**Online:** open the link above.
 
 **On a computer:** open `index.html` in any web browser. That's it — no install,
 no downloads, nothing to set up.
 
 **On a tablet or phone:** open the same file. Touch buttons appear automatically.
+
+**Save it like a real app:** on an iPad or phone, open the live link, tap the
+Share button and choose **Add to Home Screen**. Food Fun gets its own icon and
+opens fullscreen with no browser bars.
 
 ### Controls
 
@@ -55,6 +89,8 @@ Tap the 🔊 button in the corner for sound.
   Jeff. He blocks **one hit**, pops, then comes back.
 - 💥 **GAME OVER:** Jeff's belly rumbles so loud the screen cracks and the whole
   level crumbles apart.
+- 🏆 Your **best run** is remembered — the furthest level you reached and the most
+  golden chopsticks you found show up on the title screen.
 
 ## 🍔 Power-ups and secrets
 
@@ -103,6 +139,10 @@ src/levels.js   ← all four Tokyo levels live here, as plain data
 src/draw.js     how everything is drawn (Jeff, ninjas, backgrounds)
 src/audio.js    the music and sound effects, made from scratch in code
 src/input.js    keyboard and touch
+
+manifest.webmanifest   lets the game be saved to a home screen like an app
+tools/make-images.js   redraws the app icons + link preview using the game's
+                       own art code — re-run it if Jeff's look changes
 ```
 
 **Want to make it easier or harder?** Almost everything is a number you can change:
