@@ -53,25 +53,226 @@ FF.text = function (ctx, str, cx, cy, size, color, align) {
 // ---------------------------------------------------------------- JEFF ------
 
 /**
+ * Jeff has several looks and you pick one on the title screen. Each look is
+ * just a bundle of colours and part choices — the drawing code below reads them,
+ * so adding a new Jeff means adding one more entry to this list.
+ */
+FF.LOOKS = [
+  {
+    id: 'classic', name: 'Original Jeff', blurb: 'the first one',
+    skin: '#ffe0c2', skin2: '#f0b483', line: '#a76b45',
+    belt: '#2b3a8f', belt2: '#e23b5a',
+    hair: 'topknot', hairColor: '#2a1d17',
+    eyes: 'big', wide: 1.0, tall: 1.0, blush: true,
+  },
+  {
+    id: 'beefy', name: 'Big Beefy Jeff', blurb: 'a serious sumo',
+    skin: '#f7c894', skin2: '#d99a5c', line: '#8b5220',
+    belt: '#c62828', belt2: '#ffd54f',
+    hair: 'topknot', hairColor: '#150e06',
+    eyes: 'determined', brow: 'thick', wide: 1.2, tall: 1.02, blush: false,
+  },
+  {
+    id: 'cool', name: 'Cool Jeff', blurb: 'shades and spiky hair',
+    skin: '#ffd9b0', skin2: '#eeb27e', line: '#96603a',
+    belt: '#1565c0', belt2: '#00e5ff',
+    hair: 'spiky', hairColor: '#14141c', headband: '#ff1744',
+    eyes: 'shades', wide: 1.0, tall: 1.04, blush: false,
+  },
+  {
+    id: 'chonk', name: 'Chonky Jeff', blurb: 'cheeks full of food',
+    skin: '#ffe7cd', skin2: '#f5c79b', line: '#b07a52',
+    belt: '#8e24aa', belt2: '#ffca28',
+    hair: 'tuft', hairColor: '#3b2a1e',
+    eyes: 'sparkle', wide: 1.24, tall: 0.93, blush: true, cheeks: true,
+  },
+  {
+    id: 'fire', name: 'Fire Jeff', blurb: 'hair made of flames',
+    skin: '#ffcf9e', skin2: '#e79a5f', line: '#8f4b20',
+    belt: '#1b1b1b', belt2: '#ff6d00',
+    hair: 'flame',
+    eyes: 'fierce', brow: 'angry', wide: 1.06, tall: 1.02, blush: false,
+  },
+];
+
+// Which look is in play. Saved so it sticks between visits.
+FF.lookIndex = 0;
+try {
+  const saved = localStorage.getItem('foodfun.look');
+  const i = FF.LOOKS.findIndex((l) => l.id === saved);
+  if (i >= 0) FF.lookIndex = i;
+} catch (e) { /* private browsing — just use the default */ }
+
+FF.look = function () { return FF.LOOKS[FF.lookIndex]; };
+
+FF.setLook = function (i) {
+  FF.lookIndex = ((i % FF.LOOKS.length) + FF.LOOKS.length) % FF.LOOKS.length;
+  try { localStorage.setItem('foodfun.look', FF.LOOKS[FF.lookIndex].id); } catch (e) { /* ignore */ }
+};
+
+// ---- hair styles ----
+
+function drawHair(ctx, L, bw, bh, s, t) {
+  if (L.hair === 'topknot') {
+    ctx.fillStyle = L.hairColor;
+    FF.oval(ctx, 0, -bh * 0.86, bw * 0.54, bh * 0.24); ctx.fill();
+    FF.oval(ctx, 0, -bh * 1.08, bw * 0.2, bh * 0.16); ctx.fill();
+    return;
+  }
+  if (L.hair === 'spiky') {
+    ctx.fillStyle = L.hairColor;
+    // taller in the middle, leaning outward at the edges
+    const peaks = [1.02, 1.3, 1.46, 1.3, 1.02];
+    for (let i = -2; i <= 2; i++) {
+      const lean = i * bw * 0.09;
+      ctx.beginPath();
+      ctx.moveTo(i * bw * 0.24 - bw * 0.15, -bh * 0.8);
+      ctx.lineTo(i * bw * 0.24 + lean, -bh * peaks[i + 2]);
+      ctx.lineTo(i * bw * 0.24 + bw * 0.15, -bh * 0.8);
+      ctx.closePath(); ctx.fill();
+    }
+    FF.oval(ctx, 0, -bh * 0.76, bw * 0.62, bh * 0.2); ctx.fill();
+    if (L.headband) {
+      ctx.fillStyle = L.headband;
+      FF.rr(ctx, -bw * 0.66, -bh * 0.72, bw * 1.32, bh * 0.14, 3); ctx.fill();
+      ctx.fillStyle = '#fff';
+      FF.oval(ctx, 0, -bh * 0.65, bw * 0.09, bh * 0.05); ctx.fill();
+    }
+    return;
+  }
+  if (L.hair === 'tuft') {
+    ctx.fillStyle = L.hairColor;
+    ctx.beginPath();
+    ctx.moveTo(-bw * 0.1, -bh * 0.9);
+    ctx.quadraticCurveTo(bw * 0.34, -bh * 1.3, bw * 0.02, -bh * 1.08);
+    ctx.quadraticCurveTo(bw * 0.2, -bh * 1.02, -bw * 0.1, -bh * 0.9);
+    ctx.fill();
+    FF.oval(ctx, 0, -bh * 0.84, bw * 0.4, bh * 0.16); ctx.fill();
+    return;
+  }
+  if (L.hair === 'flame') {
+    // three flickering tongues of fire — tall and pointy in the middle
+    const g = ctx.createLinearGradient(0, -bh * 1.8, 0, -bh * 0.7);
+    g.addColorStop(0, '#fff3a0');
+    g.addColorStop(0.35, '#ffc300');
+    g.addColorStop(0.72, '#ff7b00');
+    g.addColorStop(1, '#e02b16');
+    ctx.fillStyle = g;
+    const tongues = [
+      { off: -0.42, top: 1.26, wide: 0.2, lean: -0.16 },
+      { off: 0.0, top: 1.78, wide: 0.24, lean: 0.05 },
+      { off: 0.44, top: 1.3, wide: 0.2, lean: 0.18 },
+    ];
+    tongues.forEach((f, i) => {
+      const lick = Math.sin(t * 0.22 + i * 2.1) * bh * 0.12;
+      const tipX = (f.off + f.lean) * bw;
+      ctx.beginPath();
+      ctx.moveTo((f.off - f.wide) * bw, -bh * 0.74);
+      ctx.quadraticCurveTo((f.off - f.wide * 1.1) * bw, -bh * (f.top * 0.6), tipX, -bh * f.top - lick);
+      ctx.quadraticCurveTo((f.off + f.wide * 1.1) * bw, -bh * (f.top * 0.6), (f.off + f.wide) * bw, -bh * 0.74);
+      ctx.closePath(); ctx.fill();
+    });
+    // a hot white core in the tallest flame
+    ctx.fillStyle = 'rgba(255,255,220,.75)';
+    ctx.beginPath();
+    ctx.moveTo(-bw * 0.09, -bh * 0.78);
+    ctx.quadraticCurveTo(-bw * 0.1, -bh * 1.1, bw * 0.02, -bh * 1.34);
+    ctx.quadraticCurveTo(bw * 0.12, -bh * 1.1, bw * 0.09, -bh * 0.78);
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+// ---- eye styles ----
+
+function drawEyes(ctx, L, bw, bh, s, t, blink) {
+  const eyeY = -bh * 0.34;
+
+  if (L.brow === 'thick') {
+    ctx.strokeStyle = L.hairColor || '#2a1d17';
+    ctx.lineWidth = 4.2 * s;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-bw * 0.5, eyeY - bh * 0.24); ctx.lineTo(-bw * 0.16, eyeY - bh * 0.18);
+    ctx.moveTo(bw * 0.5, eyeY - bh * 0.24); ctx.lineTo(bw * 0.16, eyeY - bh * 0.18);
+    ctx.stroke();
+  }
+  if (L.brow === 'angry') {
+    ctx.strokeStyle = '#7a3010';
+    ctx.lineWidth = 4.2 * s;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-bw * 0.5, eyeY - bh * 0.26); ctx.lineTo(-bw * 0.14, eyeY - bh * 0.1);
+    ctx.moveTo(bw * 0.5, eyeY - bh * 0.26); ctx.lineTo(bw * 0.14, eyeY - bh * 0.1);
+    ctx.stroke();
+  }
+
+  if (blink && L.eyes !== 'shades') {
+    ctx.strokeStyle = '#1a1a24';
+    ctx.lineWidth = 2.4 * s;
+    ctx.beginPath();
+    ctx.moveTo(-bw * 0.5, eyeY); ctx.quadraticCurveTo(-bw * 0.3, eyeY + 4, -bw * 0.14, eyeY);
+    ctx.moveTo(bw * 0.16, eyeY); ctx.quadraticCurveTo(bw * 0.34, eyeY + 4, bw * 0.5, eyeY);
+    ctx.stroke();
+    return;
+  }
+
+  if (L.eyes === 'shades') {
+    ctx.fillStyle = '#15151c';
+    FF.rr(ctx, -bw * 0.58, eyeY - bh * 0.14, bw * 1.16, bh * 0.3, bh * 0.1); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.75)';
+    ctx.beginPath();
+    ctx.moveTo(-bw * 0.46, eyeY + bh * 0.1);
+    ctx.lineTo(-bw * 0.2, eyeY - bh * 0.11);
+    ctx.lineTo(-bw * 0.08, eyeY - bh * 0.11);
+    ctx.lineTo(-bw * 0.34, eyeY + bh * 0.1);
+    ctx.closePath(); ctx.fill();
+    return;
+  }
+
+  if (L.eyes === 'determined' || L.eyes === 'fierce') {
+    const squint = L.eyes === 'fierce' ? 0.13 : 0.16;
+    ctx.fillStyle = '#fff';
+    FF.oval(ctx, -bw * 0.31, eyeY, bw * 0.19, bh * squint); ctx.fill();
+    FF.oval(ctx, bw * 0.31, eyeY, bw * 0.19, bh * squint); ctx.fill();
+    ctx.fillStyle = '#15151c';
+    FF.oval(ctx, -bw * 0.27, eyeY, bw * 0.1, bh * (squint - 0.02)); ctx.fill();
+    FF.oval(ctx, bw * 0.35, eyeY, bw * 0.1, bh * (squint - 0.02)); ctx.fill();
+    return;
+  }
+
+  // 'big' and 'sparkle'
+  const r = L.eyes === 'sparkle' ? 0.245 : 0.21;
+  ctx.fillStyle = '#fff';
+  FF.oval(ctx, -bw * 0.33, eyeY, bw * 0.21, bh * r); ctx.fill();
+  FF.oval(ctx, bw * 0.33, eyeY, bw * 0.21, bh * r); ctx.fill();
+  ctx.fillStyle = '#1a1a24';
+  FF.oval(ctx, -bw * 0.3, eyeY + bh * 0.02, bw * 0.12, bh * (r - 0.07)); ctx.fill();
+  FF.oval(ctx, bw * 0.36, eyeY + bh * 0.02, bw * 0.12, bh * (r - 0.07)); ctx.fill();
+  ctx.fillStyle = '#fff';
+  FF.oval(ctx, -bw * 0.26, eyeY - bh * 0.06, bw * 0.055, bh * 0.055); ctx.fill();
+  FF.oval(ctx, bw * 0.4, eyeY - bh * 0.06, bw * 0.055, bh * 0.055); ctx.fill();
+  if (L.eyes === 'sparkle') {
+    FF.oval(ctx, -bw * 0.35, eyeY + bh * 0.09, bw * 0.035, bh * 0.035); ctx.fill();
+    FF.oval(ctx, bw * 0.31, eyeY + bh * 0.09, bw * 0.035, bh * 0.035); ctx.fill();
+  }
+}
+
+/**
  * Jeff: a tiny, chubby, permanently hungry sumo. He squashes when he lands and
  * stretches when he jumps, which is most of what makes him feel alive.
  */
 FF.drawJeff = function (ctx, j, t) {
+  const L = (j.look != null ? FF.LOOKS[j.look] : null) || FF.look();
   const s = j.scale;
   const cx = j.x + j.w / 2;
   const cy = j.y + j.h / 2;
 
   // squash & stretch from vertical speed
   const sq = Math.max(-0.22, Math.min(0.22, -j.vy * 0.017)) + j.squash;
-  const bw = j.w * (1 - sq) * 0.55;
-  const bh = j.h * (1 + sq) * 0.56;
-
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(j.face, 1);
+  const bw = j.w * (1 - sq) * 0.55 * (L.wide || 1);
+  const bh = j.h * (1 + sq) * 0.56 * (L.tall || 1);
 
   // shadow on the ground
-  ctx.restore();
   ctx.save();
   ctx.globalAlpha = 0.22;
   ctx.fillStyle = '#000';
@@ -97,81 +298,66 @@ FF.drawJeff = function (ctx, j, t) {
 
   // legs and arms are outlined so they read against his own belly
   ctx.lineWidth = 2.2 * s;
-  ctx.strokeStyle = '#a76b45';
+  ctx.strokeStyle = L.line;
 
-  // legs (stubby, they waddle while running)
   const wob = j.onGround && Math.abs(j.vx) > 0.4 ? Math.sin(t * 0.35) * 3.6 * s : 0;
-  ctx.fillStyle = '#f0b483';
+  ctx.fillStyle = L.skin2;
   FF.oval(ctx, -bw * 0.46, bh * 0.98 + wob, bw * 0.36, bh * 0.26); ctx.fill(); ctx.stroke();
   FF.oval(ctx, bw * 0.46, bh * 0.98 - wob, bw * 0.36, bh * 0.26); ctx.fill(); ctx.stroke();
 
-  // arms
   const armY = j.slurping ? -bh * 0.12 : bh * 0.14;
   const armSwing = j.onGround && Math.abs(j.vx) > 0.4 ? Math.sin(t * 0.35) * 4 * s : 0;
-  ctx.fillStyle = '#f9d3ab';
+  ctx.fillStyle = L.skin;
   FF.oval(ctx, -bw * 1.02, armY - armSwing, bw * 0.32, bh * 0.34); ctx.fill(); ctx.stroke();
   FF.oval(ctx, bw * 1.02, armY + armSwing, bw * 0.32, bh * 0.34); ctx.fill(); ctx.stroke();
 
   // body
   const body = ctx.createLinearGradient(0, -bh, 0, bh);
-  body.addColorStop(0, '#ffe0c2');
-  body.addColorStop(1, '#f0b483');
+  body.addColorStop(0, L.skin);
+  body.addColorStop(1, L.skin2);
   ctx.fillStyle = body;
   FF.oval(ctx, 0, 0, bw, bh); ctx.fill();
   ctx.lineWidth = 2.5 * s;
-  ctx.strokeStyle = '#a76b45';
+  ctx.strokeStyle = L.line;
   ctx.stroke();
 
   // belly highlight
   ctx.fillStyle = 'rgba(255,255,255,.42)';
   FF.oval(ctx, 0, bh * 0.2, bw * 0.62, bh * 0.5); ctx.fill();
 
-  // mawashi (sumo belt)
+  // mawashi (sumo belt), clipped to the body so it wraps
   ctx.save();
   ctx.beginPath();
   FF.oval(ctx, 0, 0, bw, bh);
   ctx.clip();
-  ctx.fillStyle = '#2b3a8f';
+  ctx.fillStyle = L.belt;
   ctx.fillRect(-bw, bh * 0.42, bw * 2, bh * 0.34);
-  ctx.fillStyle = '#e23b5a';
+  ctx.fillStyle = L.belt2;
   ctx.fillRect(-bw, bh * 0.42, bw * 2, bh * 0.09);
   ctx.restore();
 
-  // topknot
-  ctx.fillStyle = '#2a1d17';
-  FF.oval(ctx, 0, -bh * 0.86, bw * 0.52, bh * 0.24); ctx.fill();
-  FF.oval(ctx, 0, -bh * 1.08, bw * 0.2, bh * 0.16); ctx.fill();
+  drawHair(ctx, L, bw, bh, s, t);
 
-  // face
-  const eyeY = -bh * 0.34;
   const blink = (Math.floor(t / 140) % 7 === 0) && (t % 140 < 10);
-  ctx.fillStyle = '#fff';
-  if (!blink) {
-    FF.oval(ctx, -bw * 0.33, eyeY, bw * 0.2, bh * 0.21); ctx.fill();
-    FF.oval(ctx, bw * 0.33, eyeY, bw * 0.2, bh * 0.21); ctx.fill();
-    ctx.fillStyle = '#1a1a24';
-    FF.oval(ctx, -bw * 0.3, eyeY + bh * 0.02, bw * 0.11, bh * 0.13); ctx.fill();
-    FF.oval(ctx, bw * 0.36, eyeY + bh * 0.02, bw * 0.11, bh * 0.13); ctx.fill();
-    ctx.fillStyle = '#fff';
-    FF.oval(ctx, -bw * 0.26, eyeY - bh * 0.05, bw * 0.05, bh * 0.05); ctx.fill();
-    FF.oval(ctx, bw * 0.4, eyeY - bh * 0.05, bw * 0.05, bh * 0.05); ctx.fill();
-  } else {
-    ctx.strokeStyle = '#1a1a24';
-    ctx.lineWidth = 2.4 * s;
-    ctx.beginPath();
-    ctx.moveTo(-bw * 0.5, eyeY); ctx.quadraticCurveTo(-bw * 0.3, eyeY + 4, -bw * 0.14, eyeY);
-    ctx.moveTo(bw * 0.16, eyeY); ctx.quadraticCurveTo(bw * 0.34, eyeY + 4, bw * 0.5, eyeY);
-    ctx.stroke();
+  drawEyes(ctx, L, bw, bh, s, t, blink);
+
+  if (L.blush) {
+    ctx.fillStyle = 'rgba(255,120,140,.5)';
+    FF.oval(ctx, -bw * 0.62, -bh * 0.14, bw * 0.16, bh * 0.1); ctx.fill();
+    FF.oval(ctx, bw * 0.62, -bh * 0.14, bw * 0.16, bh * 0.1); ctx.fill();
+  }
+  if (L.cheeks) {
+    // cheeks packed with food, puffing out either side of his mouth
+    ctx.fillStyle = L.skin;
+    ctx.strokeStyle = L.line;
+    ctx.lineWidth = 2 * s;
+    FF.oval(ctx, -bw * 0.42, -bh * 0.08, bw * 0.22, bh * 0.17); ctx.fill(); ctx.stroke();
+    FF.oval(ctx, bw * 0.42, -bh * 0.08, bw * 0.22, bh * 0.17); ctx.fill(); ctx.stroke();
   }
 
-  // blush
-  ctx.fillStyle = 'rgba(255,120,140,.5)';
-  FF.oval(ctx, -bw * 0.62, -bh * 0.14, bw * 0.16, bh * 0.1); ctx.fill();
-  FF.oval(ctx, bw * 0.62, -bh * 0.14, bw * 0.16, bh * 0.1); ctx.fill();
-
   // mouth — wide open when slurping, happy otherwise
-  ctx.fillStyle = '#7d2130';
   if (j.slurping) {
+    ctx.fillStyle = '#7d2130';
     FF.oval(ctx, 0, -bh * 0.06, bw * 0.26 + Math.sin(t * 0.5) * 2, bh * 0.2); ctx.fill();
   } else {
     ctx.strokeStyle = '#7d2130';

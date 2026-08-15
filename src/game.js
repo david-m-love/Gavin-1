@@ -139,7 +139,7 @@ var FF = window.FF || (window.FF = {});
   function hurtJeff(fromX, reason) {
     if (!G.jeff.hurtable()) return;
     if (G.shield.block(G.jeff)) {
-      popText('BLOCKED!', G.jeff.cx, G.jeff.y - 26, '#7fe4ff');
+      popText('BOB BLOCKED IT!', G.jeff.cx, G.jeff.y - 26, '#7fe4ff');
       G.jeff.invuln = 40;
       G.shake = Math.max(G.shake, 7);
       return;
@@ -203,6 +203,9 @@ var FF = window.FF || (window.FF = {});
     if (G.flash > 0) G.flash--;
 
     if (G.state === 'title') {
+      // ← and → flip through Jeff's looks; anything else starts the game
+      if (FF.input.tapped('left')) { FF.setLook(FF.lookIndex - 1); FF.audio.unlock(); FF.audio.play('eat'); }
+      if (FF.input.tapped('right')) { FF.setLook(FF.lookIndex + 1); FF.audio.unlock(); FF.audio.play('eat'); }
       if (FF.input.anyTapped()) { FF.audio.unlock(); startRun(); }
       return;
     }
@@ -243,7 +246,9 @@ var FF = window.FF || (window.FF = {});
     const ts = G.slowmo > 0 ? 0.38 : 1; // Slow-Mo Slushie affects everything but Jeff
 
     j.update(lvl, FF.input);
+    const bobWasGone = !G.shield.active;
     G.shield.update();
+    if (bobWasGone && G.shield.active) popText('BOB IS BACK! 🌈', j.cx, j.y - 34, '#7fe4ff');
 
     // slurp / magnet pull
     const all = G.pick.food.concat(G.pick.items);
@@ -267,7 +272,7 @@ var FF = window.FF || (window.FF = {});
         FF.audio.play('eat');
         burst(f.x, f.y, '#ffd166', 7);
         popText('+' + v, f.x, f.y - 14, '#ffe38a');
-        if (f.t === 'bento') popText('YUM!', f.x, f.y - 38, '#ff9ecb');
+        if (f.t === 'bento') popText('YUM! YUM!', f.x, f.y - 38, '#ff9ecb');
         if (G.hunger >= G.hungerTarget && !G.key) spawnKey();
       }
     }
@@ -293,7 +298,8 @@ var FF = window.FF || (window.FF = {});
       if (it.t === 'bigmac') {
         j.star = 380; G.magnet = 150;
         FF.audio.play('star');
-        popText('BIG MAC! SLURP EVERYTHING!', it.x, it.y - 34, '#ffb703');
+        popText('BIG MAC! YUM! YUM!', it.x, it.y - 34, '#ffb703');
+        popText('SLURP EVERYTHING!', it.x, it.y - 58, '#ffd166');
       } else if (it.t === 'riceball') {
         G.lives++;
         FF.audio.play('big');
@@ -612,7 +618,7 @@ var FF = window.FF || (window.FF = {});
     const c = G.shield.charge();
     ctx.fillStyle = G.shield.active ? '#7fe4ff' : 'hsl(' + (c * 120) + ',90%,62%)';
     FF.rr(ctx, sx + 2, sy + 2, (150 - 4) * c, 8, 4); ctx.fill();
-    FF.text(ctx, G.shield.active ? 'SHIELD READY' : 'SHIELD…', sx + 75, sy + 6, 10, '#fff');
+    FF.text(ctx, G.shield.active ? '🌈 BOB IS READY' : 'BOB IS COMING BACK…', sx + 75, sy + 6, 10, '#fff');
 
     // right side
     FF.text(ctx, G.level.name, W - 24, 30, 20, '#fff', 'right');
@@ -764,11 +770,11 @@ var FF = window.FF || (window.FF = {});
     ctx.rotate(Math.sin(G.t * 0.03) * 0.02);
     FF.text(ctx, 'FOOD FUN', 0, 0, 86, '#ffd166');
     ctx.restore();
-    FF.text(ctx, 'starring JEFF the sumo 🍜', W / 2, 178, 24, '#ff9ecb');
+    FF.text(ctx, 'starring JEFF the sumo 🍜  &  BOB the rainbow bubble 🌈', W / 2, 176, 21, '#ff9ecb');
 
-    // Jeff waving on the title screen
+    // Jeff waving on the title screen — this is also the character picker
     titleJeff.x = W / 2 - titleJeff.w / 2;
-    titleJeff.y = 232 + Math.sin(G.t * 0.06) * 6;
+    titleJeff.y = 214 + Math.sin(G.t * 0.06) * 6;
     titleJeff.vy = Math.sin(G.t * 0.06) * 2;
     FF.drawJeff(ctx, titleJeff, G.t);
 
@@ -776,21 +782,35 @@ var FF = window.FF || (window.FF = {});
     const snacks = ['🍜', '🥤', '🌭', '🍡', '🍣', '🍢'];
     for (let i = 0; i < snacks.length; i++) {
       const a = G.t * 0.012 + i * (Math.PI * 2 / snacks.length);
-      FF.emoji(ctx, snacks[i], W / 2 + Math.cos(a) * 210, 300 + Math.sin(a) * 62, 34, '#ffe7c2');
+      FF.emoji(ctx, snacks[i], W / 2 + Math.cos(a) * 240, 300 + Math.sin(a) * 62, 34, '#ffe7c2');
     }
+
+    // ---- pick your Jeff ----
+    const look = FF.look();
+    const arrowPulse = 0.6 + 0.4 * Math.sin(G.t * 0.1);
+    ctx.save();
+    ctx.globalAlpha = arrowPulse;
+    FF.text(ctx, '◀', W / 2 - 150, 278, 44, '#9dffb0');
+    FF.text(ctx, '▶', W / 2 + 150, 278, 44, '#9dffb0');
+    ctx.restore();
+    ctx.fillStyle = 'rgba(0,0,0,.5)';
+    FF.rr(ctx, W / 2 - 190, 336, 380, 46, 12); ctx.fill();
+    FF.text(ctx, look.name, W / 2, 351, 22, '#ffd166');
+    FF.text(ctx, '← →  pick your sumo  (' + (FF.lookIndex + 1) + ' of ' + FF.LOOKS.length + ')  — ' + look.blurb,
+      W / 2, 372, 13, 'rgba(255,255,255,.85)');
 
     const touch = document.body.classList.contains('touch');
     ctx.fillStyle = 'rgba(0,0,0,.45)';
-    FF.rr(ctx, W / 2 - 260, 384, 520, 84, 14); ctx.fill();
+    FF.rr(ctx, W / 2 - 270, 396, 540, 76, 14); ctx.fill();
     if (touch) {
-      FF.text(ctx, 'Use the buttons: ◀ ▶ move   ⬆ jump   🌀 slurp   💥 bump', W / 2, 410, 18, '#fff');
+      FF.text(ctx, 'Buttons: ◀ ▶ move   ⬆ jump   🌀 slurp   💥 bump', W / 2, 420, 17, '#fff');
     } else {
-      FF.text(ctx, '← →  run     SPACE  jump     Z  vacuum slurp     X  belly bump', W / 2, 410, 18, '#fff');
+      FF.text(ctx, '← →  run     SPACE  jump     Z  vacuum slurp     X  belly bump', W / 2, 420, 17, '#fff');
     }
-    FF.text(ctx, 'Eat everything. Dodge the 🍌 Banana Ninjas. Fill the meter. Get the 🔑', W / 2, 442, 16, 'rgba(255,255,255,.85)');
+    FF.text(ctx, 'Eat everything. Dodge the 🍌 Banana Ninjas. Fill the meter. Get the 🔑', W / 2, 450, 15, 'rgba(255,255,255,.85)');
 
     if (Math.floor(G.t / 30) % 2 === 0) {
-      FF.text(ctx, touch ? 'TAP TO START' : 'PRESS ANY KEY TO START', W / 2, 502, 26, '#9dffb0');
+      FF.text(ctx, touch ? 'TAP THE SCREEN TO START' : 'PRESS SPACE TO START', W / 2, 502, 26, '#9dffb0');
     }
   }
 

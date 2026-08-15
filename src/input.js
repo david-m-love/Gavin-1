@@ -9,11 +9,13 @@ FF.input = (function () {
   const pressed = {}; // edge-triggered, cleared at the end of each frame
   let anyPress = false;
 
+  // Left/right are excluded from "any button" so they can flip through Jeff's
+  // looks on the title screen without also starting the game.
   function down(k) {
     if (!k) return;
     if (!held[k]) pressed[k] = true;
     held[k] = true;
-    anyPress = true;
+    if (k !== 'left' && k !== 'right') anyPress = true;
     FF.audio.unlock();
   }
   function up(k) {
@@ -54,8 +56,13 @@ FF.input = (function () {
     el.addEventListener('pointercancel', release);
     el.addEventListener('pointerleave', release);
   });
-  // Tapping the canvas counts as "any button" for title / game-over screens.
-  addEventListener('pointerdown', () => { anyPress = true; FF.audio.unlock(); });
+  // Tapping the screen counts as "any button" for title / game-over screens —
+  // but not when the tap landed on one of the on-screen control buttons.
+  addEventListener('pointerdown', (e) => {
+    if (e.target && e.target.closest && e.target.closest('#touch .btn')) return;
+    anyPress = true;
+    FF.audio.unlock();
+  });
 
   return {
     held,

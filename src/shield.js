@@ -1,6 +1,6 @@
-// FOOD FUN — the Fruity Pebbles sidekick
-// Gavin's idea: a swirling rainbow bubble made of cereal pebbles that orbits
-// Jeff. It blocks exactly one hit, pops, and then recharges.
+// FOOD FUN — BOB, the Fruity Pebbles sidekick
+// Gavin's idea: Bob is a swirling rainbow bubble made of cereal pebbles that
+// orbits Jeff. He blocks exactly one hit, pops, and then comes back.
 
 var FF = window.FF || (window.FF = {});
 
