@@ -4,6 +4,8 @@
 
 A game designed by **K. Gavin Love**.
 
+### 🎮 Play it now: **[food-fun-iota.vercel.app](https://food-fun-iota.vercel.app/)**
+
 Jeff is a tiny, chubby sumo wrestler in Tokyo, and he is **starving**. Run around
 collecting ramen, slushies, corn dogs and takoyaki until your hunger meter is
 full — then grab the 🔑 KEY and move on. Watch out for the 🍌 **Banana Ninjas**
@@ -24,10 +26,10 @@ pick is saved, so it's still there next time you play.
 
 ## 🌐 Play it online
 
-**Live at:** _(paste the Vercel link here once it's deployed)_
+### ▶ **[food-fun-iota.vercel.app](https://food-fun-iota.vercel.app/)**
 
 Send that link to anyone and they can play — computer, phone or tablet, no
-downloads.
+downloads, nothing to install.
 
 ### Putting it on Vercel (about two minutes)
 

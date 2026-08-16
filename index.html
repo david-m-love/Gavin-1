@@ -9,15 +9,23 @@
 <!-- Tab icon: an inline SVG so there's no extra file and no 404. -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍜</text></svg>">
 
-<!-- Link preview, for when Gavin texts the game to a friend -->
+<!-- Link preview, for when Gavin texts the game to a friend.
+     These URLs must be absolute — link previewers fetch them without a page to
+     resolve against. If the Vercel project is ever renamed, update them here. -->
+<link rel="canonical" href="https://food-fun-iota.vercel.app/">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="Food Fun">
+<meta property="og:url" content="https://food-fun-iota.vercel.app/">
 <meta property="og:title" content="FOOD FUN — starring Jeff the sumo">
 <meta property="og:description" content="Jeff the sumo is starving. Eat your way across Tokyo, dodge the Banana Ninjas, and chomp the Dragon Fruit Boss. A game by K. Gavin Love.">
-<meta property="og:image" content="/og-image.png">
+<meta property="og:image" content="https://food-fun-iota.vercel.app/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Jeff the sumo inside a rainbow bubble, surrounded by Tokyo street food at night.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="FOOD FUN — starring Jeff the sumo">
 <meta name="twitter:description" content="Eat your way across Tokyo. Dodge the Banana Ninjas. Chomp the Dragon Fruit Boss.">
-<meta name="twitter:image" content="/og-image.png">
+<meta name="twitter:image" content="https://food-fun-iota.vercel.app/og-image.png">
 
 <!-- Add to Home Screen: opens fullscreen on a tablet, like a real app -->
 <link rel="manifest" href="manifest.webmanifest">
