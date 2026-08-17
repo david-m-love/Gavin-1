@@ -2,6 +2,8 @@
 // They guard the best food. Each one is tied to a guard post and won't chase
 // Jeff past it, so the rare snacks always have someone standing over them.
 // Belly-bump them (or hit them in Big Mac star mode) and they go flying.
+//
+// On the Bullet Train level they also throw bananas at you.
 
 var FF = window.FF || (window.FF = {});
 
@@ -10,8 +12,12 @@ const CHASE_SPEED = 2.35;
 const SPOT_X = 230;
 const SPOT_Y = 70;
 
+const THROW_EVERY = 130;   // frames between throws
+const THROW_RANGE = 400;   // how far they'll bother throwing
+const THROW_GRAVITY = 0.34;
+
 FF.Ninja = class Ninja {
-  constructor(spec) {
+  constructor(spec, throws) {
     this.home = spec.x;
     this.range = spec.range || 100;
     this.w = 30; this.h = 40;
@@ -23,12 +29,14 @@ FF.Ninja = class Ninja {
     this.vx = 0; this.vy = 0;
     this.spin = 0;
     this.dead = false;
+    this.throws = !!throws;
+    this.throwTimer = 60 + Math.random() * THROW_EVERY;
   }
 
   get cx() { return this.x + this.w / 2; }
   get cy() { return this.y + this.h / 2; }
 
-  update(jeff, ts, groundLimit) {
+  update(jeff, ts, groundLimit, thrown) {
     if (this.flying) {
       this.x += this.vx * ts;
       this.y += this.vy * ts;
@@ -58,6 +66,25 @@ FF.Ninja = class Ninja {
     if (this.x > hi) { this.x = hi; this.dir = -1; }
 
     this.face = this.dir;
+
+    // ---- lob a banana ----
+    if (this.throws && thrown) {
+      this.throwTimer -= ts;
+      const inRange = Math.abs(dx) < THROW_RANGE && Math.abs(dy) < 200;
+      if (this.throwTimer <= 0 && inRange) {
+        this.throwTimer = THROW_EVERY + Math.random() * 60;
+        this.face = Math.sign(dx) || this.face;
+        // arc it: enough horizontal speed to cover the gap while it falls
+        const flight = 48;
+        thrown.push({
+          x: this.cx, y: this.cy - 10,
+          vx: dx / flight,
+          vy: (dy - 0.5 * THROW_GRAVITY * flight * flight) / flight,
+          spin: 0, life: 200,
+        });
+        FF.audio.play('throw');
+      }
+    }
   }
 
   hits(jeff) {
@@ -75,5 +102,28 @@ FF.Ninja = class Ninja {
 
   draw(ctx, t) {
     FF.drawNinja(ctx, this, t);
+  }
+};
+
+/** Move every thrown banana. Returns nothing; dead ones are spliced out. */
+FF.updateThrown = function (list, ts, groundY) {
+  for (let i = list.length - 1; i >= 0; i--) {
+    const b = list[i];
+    b.x += b.vx * ts;
+    b.y += b.vy * ts;
+    b.vy += THROW_GRAVITY * ts;
+    b.spin += 0.22 * ts;
+    b.life -= ts;
+    if (b.life <= 0 || b.y > groundY + 30) list.splice(i, 1);
+  }
+};
+
+FF.drawThrown = function (ctx, list) {
+  for (const b of list) {
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.spin);
+    FF.emoji(ctx, '🍌', 0, 0, 30, '#ffe14b');
+    ctx.restore();
   }
 };

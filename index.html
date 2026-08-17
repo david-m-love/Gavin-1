@@ -80,6 +80,15 @@
   #bJump { background: rgba(120,225,140,.22); border-color: rgba(150,255,170,.75); }
   #bSlurp { background: rgba(120,190,255,.22); border-color: rgba(150,210,255,.75); }
   #bBump { background: rgba(255,150,90,.22); border-color: rgba(255,180,120,.75); }
+  /* dimmed while a move is recharging or unavailable */
+  .btn.dim { opacity: .3; }
+  /* BUMP turns into CHOMP once you've eaten a strawberry */
+  #bBump.chomp {
+    background: rgba(157,255,176,.34);
+    border-color: #9dffb0;
+    animation: chompPulse .6s ease-in-out infinite alternate;
+  }
+  @keyframes chompPulse { from { transform: scale(1); } to { transform: scale(1.09); } }
 
   /* ---- mute ---- */
   #mute {
@@ -99,9 +108,9 @@
       <div class="btn" data-key="right">▶</div>
     </div>
     <div class="pad" id="padR">
-      <div class="btn" id="bSlurp" data-key="slurp">🌀<small>SLURP</small></div>
-      <div class="btn" id="bBump"  data-key="bump">💥<small>BUMP</small></div>
-      <div class="btn" id="bJump"  data-key="jump">⬆<small>JUMP</small></div>
+      <div class="btn" id="bSlurp" data-key="slurp"><span class="ico">🌀</span><small>SLURP</small></div>
+      <div class="btn" id="bBump"  data-key="bump"><span class="ico">💥</span><small>BUMP</small></div>
+      <div class="btn" id="bJump"  data-key="jump"><span class="ico">⬆</span><small>JUMP</small></div>
     </div>
   </div>
 

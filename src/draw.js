@@ -25,7 +25,7 @@ FF.rr = function (ctx, x, y, w, h, r) {
 
 FF.oval = function (ctx, cx, cy, rx, ry) {
   ctx.beginPath();
-  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, Math.abs(rx), Math.abs(ry), 0, 0, Math.PI * 2);
   ctx.closePath();
 };
 
@@ -87,10 +87,10 @@ FF.LOOKS = [
     eyes: 'sparkle', wide: 1.24, tall: 0.93, blush: true, cheeks: true,
   },
   {
-    id: 'fire', name: 'Fire Jeff', blurb: 'hair made of flames',
+    id: 'green', name: 'Green Jeff', blurb: 'green belt, mashed potato hat',
     skin: '#ffcf9e', skin2: '#e79a5f', line: '#8f4b20',
-    belt: '#1b1b1b', belt2: '#ff6d00',
-    hair: 'flame',
+    belt: '#2e9e4f', belt2: '#b6ff3d',
+    hair: 'potato',
     eyes: 'fierce', brow: 'angry', wide: 1.06, tall: 1.02, blush: false,
   },
 ];
@@ -121,7 +121,6 @@ function drawHair(ctx, L, bw, bh, s, t) {
   }
   if (L.hair === 'spiky') {
     ctx.fillStyle = L.hairColor;
-    // taller in the middle, leaning outward at the edges
     const peaks = [1.02, 1.3, 1.46, 1.3, 1.02];
     for (let i = -2; i <= 2; i++) {
       const lean = i * bw * 0.09;
@@ -150,34 +149,26 @@ function drawHair(ctx, L, bw, bh, s, t) {
     FF.oval(ctx, 0, -bh * 0.84, bw * 0.4, bh * 0.16); ctx.fill();
     return;
   }
-  if (L.hair === 'flame') {
-    // three flickering tongues of fire — tall and pointy in the middle
-    const g = ctx.createLinearGradient(0, -bh * 1.8, 0, -bh * 0.7);
-    g.addColorStop(0, '#fff3a0');
-    g.addColorStop(0.35, '#ffc300');
-    g.addColorStop(0.72, '#ff7b00');
-    g.addColorStop(1, '#e02b16');
-    ctx.fillStyle = g;
-    const tongues = [
-      { off: -0.42, top: 1.26, wide: 0.2, lean: -0.16 },
-      { off: 0.0, top: 1.78, wide: 0.24, lean: 0.05 },
-      { off: 0.44, top: 1.3, wide: 0.2, lean: 0.18 },
-    ];
-    tongues.forEach((f, i) => {
-      const lick = Math.sin(t * 0.22 + i * 2.1) * bh * 0.12;
-      const tipX = (f.off + f.lean) * bw;
-      ctx.beginPath();
-      ctx.moveTo((f.off - f.wide) * bw, -bh * 0.74);
-      ctx.quadraticCurveTo((f.off - f.wide * 1.1) * bw, -bh * (f.top * 0.6), tipX, -bh * f.top - lick);
-      ctx.quadraticCurveTo((f.off + f.wide * 1.1) * bw, -bh * (f.top * 0.6), (f.off + f.wide) * bw, -bh * 0.74);
-      ctx.closePath(); ctx.fill();
-    });
-    // a hot white core in the tallest flame
-    ctx.fillStyle = 'rgba(255,255,220,.75)';
+  if (L.hair === 'potato') {
+    // Gavin's mashed potato hat: a fluffy scooped mound with a butter melt
+    const wob = Math.sin(t * 0.05) * bw * 0.02;
+    ctx.fillStyle = '#fff3d4';
+    ctx.strokeStyle = '#e3c188';
+    ctx.lineWidth = 2 * s;
+    // the scoops — a big fluffy pile, widest at the bottom
+    FF.oval(ctx, -bw * 0.44, -bh * 0.82, bw * 0.36, bh * 0.22); ctx.fill(); ctx.stroke();
+    FF.oval(ctx, bw * 0.44, -bh * 0.82, bw * 0.36, bh * 0.22); ctx.fill(); ctx.stroke();
+    FF.oval(ctx, 0, -bh * 0.9, bw * 0.56, bh * 0.28); ctx.fill(); ctx.stroke();
+    FF.oval(ctx, -bw * 0.24, -bh * 1.08 + wob, bw * 0.34, bh * 0.22); ctx.fill(); ctx.stroke();
+    FF.oval(ctx, bw * 0.26, -bh * 1.1 - wob, bw * 0.32, bh * 0.21); ctx.fill(); ctx.stroke();
+    FF.oval(ctx, 0, -bh * 1.22, bw * 0.28, bh * 0.18); ctx.fill(); ctx.stroke();
+    // pat of butter melting down the middle
+    ctx.fillStyle = '#ffd34d';
+    FF.rr(ctx, -bw * 0.1, -bh * 1.32, bw * 0.2, bh * 0.11, 3 * s); ctx.fill();
     ctx.beginPath();
-    ctx.moveTo(-bw * 0.09, -bh * 0.78);
-    ctx.quadraticCurveTo(-bw * 0.1, -bh * 1.1, bw * 0.02, -bh * 1.34);
-    ctx.quadraticCurveTo(bw * 0.12, -bh * 1.1, bw * 0.09, -bh * 0.78);
+    ctx.moveTo(-bw * 0.06, -bh * 1.24);
+    ctx.quadraticCurveTo(-bw * 0.02, -bh * 1.02, bw * 0.05, -bh * 0.92);
+    ctx.quadraticCurveTo(bw * 0.1, -bh * 1.06, bw * 0.06, -bh * 1.24);
     ctx.closePath(); ctx.fill();
   }
 }
@@ -267,7 +258,6 @@ FF.drawJeff = function (ctx, j, t) {
   const cx = j.x + j.w / 2;
   const cy = j.y + j.h / 2;
 
-  // squash & stretch from vertical speed
   const sq = Math.max(-0.22, Math.min(0.22, -j.vy * 0.017)) + j.squash;
   const bw = j.w * (1 - sq) * 0.55 * (L.wide || 1);
   const bh = j.h * (1 + sq) * 0.56 * (L.tall || 1);
@@ -288,8 +278,6 @@ FF.drawJeff = function (ctx, j, t) {
   if (j.star > 0) {
     ctx.save();
     const hue = (t * 6) % 360;
-    ctx.shadowColor = 'hsl(' + hue + ',100%,60%)';
-    ctx.shadowBlur = 26;
     ctx.fillStyle = 'hsla(' + hue + ',100%,65%,.35)';
     FF.oval(ctx, 0, 0, bw * 1.35, bh * 1.35);
     ctx.fill();
@@ -321,7 +309,6 @@ FF.drawJeff = function (ctx, j, t) {
   ctx.strokeStyle = L.line;
   ctx.stroke();
 
-  // belly highlight
   ctx.fillStyle = 'rgba(255,255,255,.42)';
   FF.oval(ctx, 0, bh * 0.2, bw * 0.62, bh * 0.5); ctx.fill();
 
@@ -347,7 +334,6 @@ FF.drawJeff = function (ctx, j, t) {
     FF.oval(ctx, bw * 0.62, -bh * 0.14, bw * 0.16, bh * 0.1); ctx.fill();
   }
   if (L.cheeks) {
-    // cheeks packed with food, puffing out either side of his mouth
     ctx.fillStyle = L.skin;
     ctx.strokeStyle = L.line;
     ctx.lineWidth = 2 * s;
@@ -355,10 +341,18 @@ FF.drawJeff = function (ctx, j, t) {
     FF.oval(ctx, bw * 0.42, -bh * 0.08, bw * 0.22, bh * 0.17); ctx.fill(); ctx.stroke();
   }
 
-  // mouth — wide open when slurping, happy otherwise
-  if (j.slurping) {
+  // mouth — wide open when slurping or chomping, happy otherwise
+  if (j.slurping || j.chomp > 0) {
     ctx.fillStyle = '#7d2130';
-    FF.oval(ctx, 0, -bh * 0.06, bw * 0.26 + Math.sin(t * 0.5) * 2, bh * 0.2); ctx.fill();
+    FF.oval(ctx, 0, -bh * 0.06, bw * 0.28 + Math.sin(t * 0.5) * 2, bh * 0.22); ctx.fill();
+    ctx.fillStyle = '#fff';
+    for (const fx of [-0.16, 0, 0.16]) {
+      ctx.beginPath();
+      ctx.moveTo(bw * fx - 3, -bh * 0.16);
+      ctx.lineTo(bw * fx, -bh * 0.06);
+      ctx.lineTo(bw * fx + 3, -bh * 0.16);
+      ctx.closePath(); ctx.fill();
+    }
   } else {
     ctx.strokeStyle = '#7d2130';
     ctx.lineWidth = 2.6 * s;
@@ -386,18 +380,15 @@ FF.drawNinja = function (ctx, n, t) {
     ctx.globalAlpha = 1;
   }
 
-  // alert bubble when he's spotted you
   if (n.alert > 0 && !n.flying) {
     FF.text(ctx, '!', 0, -n.h * 0.85, 22, '#ff4b6b');
   }
 
   FF.emoji(ctx, '🍌', 0, 0, n.h * 1.15, '#ffe14b');
 
-  // ninja mask band
   ctx.fillStyle = '#22232c';
   FF.rr(ctx, -n.w * 0.46, -n.h * 0.16, n.w * 0.92, n.h * 0.26, 3);
   ctx.fill();
-  // headband tails, flapping
   ctx.beginPath();
   ctx.moveTo(-n.w * 0.42, -n.h * 0.1);
   ctx.quadraticCurveTo(-n.w * 0.8, -n.h * 0.02 + Math.sin(t * 0.2) * 3, -n.w * 0.95, n.h * 0.16);
@@ -405,7 +396,6 @@ FF.drawNinja = function (ctx, n, t) {
   ctx.closePath();
   ctx.fill();
 
-  // eyes
   ctx.fillStyle = '#fff';
   FF.oval(ctx, -n.w * 0.17, -n.h * 0.04, n.w * 0.12, n.h * 0.07); ctx.fill();
   FF.oval(ctx, n.w * 0.17, -n.h * 0.04, n.w * 0.12, n.h * 0.07); ctx.fill();
@@ -417,27 +407,47 @@ FF.drawNinja = function (ctx, n, t) {
 };
 
 // ----------------------------------------------------------- BACKGROUNDS ----
+// The city used to be redrawn from scratch every single frame — roughly three
+// thousand little rectangles for the lit windows alone, which is exactly the
+// kind of thing that makes an older tablet crawl. Now each scrolling layer is
+// painted once into an offscreen tile and just stamped back each frame.
 
-function neonBg(ctx, W, H, camX, t) {
-  const sky = ctx.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, '#160c2e');
-  sky.addColorStop(0.6, '#2b1350');
-  sky.addColorStop(1, '#4a1a4e');
-  ctx.fillStyle = sky;
+const tiles = {};
+
+function tile(key, w, h, paint) {
+  if (tiles[key]) return tiles[key];
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  paint(c.getContext('2d'), w, h);
+  tiles[key] = c;
+  return c;
+}
+
+/** Stamp a repeating tile across the screen at the given scroll offset. */
+function blit(ctx, img, offset, W) {
+  const p = img.width;
+  let x = -(((offset % p) + p) % p);
+  while (x < W) { ctx.drawImage(img, x, 0); x += p; }
+}
+
+function skyFill(ctx, W, H, stops) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  for (const s of stops) g.addColorStop(s[0], s[1]);
+  ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
+}
 
-  // two parallax layers of buildings
-  for (let layer = 0; layer < 2; layer++) {
-    const par = layer === 0 ? 0.18 : 0.42;
-    const base = H - 70 - layer * -30;
-    for (let i = -1; i < 22; i++) {
+// ---- Shibuya at night ----
+function neonLayer(layer) {
+  return function (ctx, w, h) {
+    const base = h - 70 + layer * 30;
+    for (let i = -1; i < 24; i++) {
       const seed = i + layer * 100;
       const bw = 90 + FF.hash(seed) * 80;
       const bh = 130 + FF.hash(seed + 7) * 220 - layer * 40;
-      const x = ((i * 150 - camX * par) % 3300 + 3300) % 3300 - 200;
+      const x = i * 150;
       ctx.fillStyle = layer === 0 ? '#1c1136' : '#2a1750';
       ctx.fillRect(x, base - bh, bw, bh);
-      // lit windows
       const cols = Math.floor(bw / 18);
       for (let c = 0; c < cols; c++) {
         for (let r = 0; r < Math.floor(bh / 22); r++) {
@@ -448,95 +458,87 @@ function neonBg(ctx, W, H, camX, t) {
           }
         }
       }
-      // neon signs
       if (FF.hash(seed + 3) > 0.55) {
         const hue = (FF.hash(seed + 11) * 360) | 0;
-        const pulse = 0.6 + 0.4 * Math.sin(t * 0.05 + i);
         ctx.save();
         ctx.shadowColor = 'hsl(' + hue + ',100%,60%)';
         ctx.shadowBlur = 18;
-        ctx.fillStyle = 'hsla(' + hue + ',100%,68%,' + pulse + ')';
+        ctx.fillStyle = 'hsl(' + hue + ',100%,68%)';
         FF.rr(ctx, x + bw * 0.2, base - bh + 26, bw * 0.6, 16, 4);
         ctx.fill();
         ctx.restore();
       }
     }
-  }
+  };
+}
 
-  // the giant screens on the sides of the buildings
+function neonBg(ctx, W, H, camX, t, lowFx) {
+  skyFill(ctx, W, H, [[0, '#160c2e'], [0.6, '#2b1350'], [1, '#4a1a4e']]);
+  blit(ctx, tile('neon0', 3600, H, neonLayer(0)), camX * 0.18, W);
+  blit(ctx, tile('neon1', 3600, H, neonLayer(1)), camX * 0.42, W);
+
+  // the giant animated screens stay live — there are only three of them
   for (let i = 0; i < 3; i++) {
     const sx = ((i * 900 - camX * 0.42) % 2700 + 2700) % 2700 - 400;
-    ctx.save();
+    if (sx < -260 || sx > W + 40) continue;
     ctx.fillStyle = '#0b0b18';
     FF.rr(ctx, sx, 168, 220, 130, 8); ctx.fill();
-    const hue2 = (t * 2 + i * 90) % 360;
-    ctx.fillStyle = 'hsla(' + hue2 + ',85%,55%,.9)';
+    ctx.fillStyle = 'hsl(' + ((t * 2 + i * 90) % 360) + ',85%,55%)';
     FF.rr(ctx, sx + 8, 176, 204, 114, 5); ctx.fill();
     FF.emoji(ctx, ['🍜', '🥤', '🌭'][i], sx + 110, 233, 62);
-    ctx.restore();
   }
 }
 
-function ramenBg(ctx, W, H, camX, t) {
-  const sky = ctx.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, '#3a1620');
-  sky.addColorStop(1, '#8a3b23');
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, W, H);
-
-  // shop fronts
-  for (let i = -1; i < 16; i++) {
-    const x = ((i * 230 - camX * 0.5) % 3680 + 3680) % 3680 - 260;
+// ---- Ramen Alley ----
+function ramenShops(ctx, w, h) {
+  for (let i = 0; i < 16; i++) {
+    const x = i * 230;
     ctx.fillStyle = '#5c2318';
     ctx.fillRect(x, 150, 210, 320);
     ctx.fillStyle = '#7c3320';
     ctx.fillRect(x + 10, 250, 190, 220);
-    // noren curtain
     ctx.fillStyle = '#e0452f';
     ctx.fillRect(x + 10, 250, 190, 46);
     ctx.fillStyle = '#fff';
-    FF.emoji(ctx, '麺', x + 115, 273, 30);
-    // paper lanterns
+    FF.emoji(ctx, '麺', x + 115, 273, 30, '#fff');
+  }
+}
+
+function ramenBg(ctx, W, H, camX, t, lowFx) {
+  skyFill(ctx, W, H, [[0, '#3a1620'], [1, '#8a3b23']]);
+  blit(ctx, tile('ramen0', 230 * 16, H, ramenShops), camX * 0.5, W);
+
+  // lanterns sway, so they stay live
+  for (let i = -1; i < 18; i++) {
+    const x = ((i * 230 - camX * 0.5) % 3680 + 3680) % 3680 - 260;
+    if (x < -120 || x > W + 120) continue;
     for (let k = 0; k < 2; k++) {
       const lx = x + 45 + k * 120;
       const sway = Math.sin(t * 0.03 + i + k) * 4;
       ctx.strokeStyle = '#3a1a12'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(lx, 150); ctx.lineTo(lx + sway, 186); ctx.stroke();
       ctx.save();
-      ctx.shadowColor = '#ff9b3d'; ctx.shadowBlur = 22;
+      if (!lowFx) { ctx.shadowColor = '#ff9b3d'; ctx.shadowBlur = 22; }
       ctx.fillStyle = '#ff6b35';
       FF.oval(ctx, lx + sway, 206, 17, 22); ctx.fill();
       ctx.restore();
-      ctx.fillStyle = 'rgba(0,0,0,.35)';
-      ctx.fillRect(lx + sway - 17, 203, 34, 3);
     }
   }
 }
 
-function subwayBg(ctx, W, H, camX, t) {
-  ctx.fillStyle = '#161a24';
-  ctx.fillRect(0, 0, W, H);
-
-  // tiled wall
-  for (let i = -1; i < 40; i++) {
+// ---- Subway ----
+function subwayWall(ctx, w, h) {
+  for (let i = 0; i < 40; i++) {
     for (let r = 0; r < 9; r++) {
-      const x = ((i * 56 - camX * 0.45) % 2240 + 2240) % 2240 - 60;
       ctx.fillStyle = (i + r) % 2 ? '#252c3c' : '#2b3346';
-      ctx.fillRect(x, 40 + r * 42, 54, 40);
+      ctx.fillRect(i * 56, 40 + r * 42, 54, 40);
     }
   }
-  // tunnel mouth
-  const tx = ((520 - camX * 0.45) % 1800 + 1800) % 1800 - 300;
-  ctx.fillStyle = '#0a0d14';
-  ctx.beginPath();
-  ctx.moveTo(tx, 430); ctx.lineTo(tx, 220);
-  ctx.quadraticCurveTo(tx + 90, 150, tx + 180, 220);
-  ctx.lineTo(tx + 180, 430);
-  ctx.closePath(); ctx.fill();
+}
 
-  // vending machines + signage
-  for (let i = -1; i < 14; i++) {
-    const x = ((i * 300 - camX * 0.62) % 4200 + 4200) % 4200 - 320;
+function subwayMachines(ctx, w, h) {
+  for (let i = 0; i < 14; i++) {
+    const x = i * 300;
     ctx.fillStyle = '#d63b52';
     FF.rr(ctx, x, 300, 74, 132, 6); ctx.fill();
     ctx.fillStyle = '#12203a';
@@ -545,21 +547,29 @@ function subwayBg(ctx, W, H, camX, t) {
       ctx.fillStyle = ['#ffd23f', '#4cc9f0', '#90e07a'][k % 3];
       ctx.fillRect(x + 13 + (k % 3) * 18, 320 + Math.floor(k / 3) * 32, 12, 24);
     }
-    ctx.fillStyle = 'rgba(255,255,255,' + (0.5 + 0.5 * Math.sin(t * 0.08 + i)) + ')';
-    ctx.fillRect(x + 8, 396, 58, 6);
   }
 }
 
-function templeBg(ctx, W, H, camX, t) {
-  const sky = ctx.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, '#ffd6e8');
-  sky.addColorStop(0.55, '#ffb3d1');
-  sky.addColorStop(1, '#f8e3c8');
-  ctx.fillStyle = sky;
+function subwayBg(ctx, W, H, camX, t, lowFx) {
+  ctx.fillStyle = '#161a24';
   ctx.fillRect(0, 0, W, H);
+  blit(ctx, tile('sub0', 56 * 40, H, subwayWall), camX * 0.45, W);
 
-  // distant pagoda
-  const px = 700 - camX * 0.15;
+  const tx = ((520 - camX * 0.45) % 1800 + 1800) % 1800 - 300;
+  ctx.fillStyle = '#0a0d14';
+  ctx.beginPath();
+  ctx.moveTo(tx, 430); ctx.lineTo(tx, 220);
+  ctx.quadraticCurveTo(tx + 90, 150, tx + 180, 220);
+  ctx.lineTo(tx + 180, 430);
+  ctx.closePath(); ctx.fill();
+
+  blit(ctx, tile('sub1', 300 * 14, H, subwayMachines), camX * 0.62, W);
+}
+
+// ---- Temple ----
+function templeScene(ctx, w, h) {
+  // pagoda
+  const px = 700;
   ctx.fillStyle = 'rgba(150,60,80,.35)';
   for (let f = 0; f < 4; f++) {
     const wdt = 150 - f * 26;
@@ -570,42 +580,42 @@ function templeBg(ctx, W, H, camX, t) {
     ctx.closePath(); ctx.fill();
     ctx.fillRect(px - wdt * 0.45, y - 52, wdt * 0.9, 32);
   }
-
   // torii gates
-  for (let i = -1; i < 12; i++) {
-    const x = ((i * 340 - camX * 0.4) % 4080 + 4080) % 4080 - 380;
+  for (let i = 0; i < 12; i++) {
+    const x = i * 340;
     ctx.fillStyle = '#e0453f';
     ctx.fillRect(x, 250, 16, 220);
     ctx.fillRect(x + 150, 250, 16, 220);
     ctx.fillRect(x - 18, 244, 202, 15);
     ctx.fillRect(x - 8, 274, 182, 11);
   }
-
   // cherry trees
-  for (let i = -1; i < 14; i++) {
-    const x = ((i * 280 - camX * 0.66) % 3920 + 3920) % 3920 - 300;
+  for (let i = 0; i < 15; i++) {
+    const x = i * 280;
     ctx.fillStyle = '#6b4a3a';
     ctx.fillRect(x + 40, 330, 16, 140);
     ctx.fillStyle = 'rgba(255,170,205,.95)';
     for (let b = 0; b < 6; b++) {
-      const bx = x + 48 + Math.cos(b * 1.05) * 52;
-      const by = 320 + Math.sin(b * 1.05) * 34;
-      FF.oval(ctx, bx, by, 40, 30); ctx.fill();
+      FF.oval(ctx, x + 48 + Math.cos(b * 1.05) * 52, 320 + Math.sin(b * 1.05) * 34, 40, 30);
+      ctx.fill();
     }
   }
 }
 
-FF.drawBackground = function (ctx, theme, W, H, camX, t) {
-  if (theme === 'neon') neonBg(ctx, W, H, camX, t);
-  else if (theme === 'ramen') ramenBg(ctx, W, H, camX, t);
-  else if (theme === 'subway') subwayBg(ctx, W, H, camX, t);
-  else templeBg(ctx, W, H, camX, t);
+function templeBg(ctx, W, H, camX, t, lowFx) {
+  skyFill(ctx, W, H, [[0, '#ffd6e8'], [0.55, '#ffb3d1'], [1, '#f8e3c8']]);
+  blit(ctx, tile('temple0', 4080, H, templeScene), camX * 0.4, W);
+}
+
+FF.drawBackground = function (ctx, theme, W, H, camX, t, lowFx) {
+  if (theme === 'neon') neonBg(ctx, W, H, camX, t, lowFx);
+  else if (theme === 'ramen') ramenBg(ctx, W, H, camX, t, lowFx);
+  else if (theme === 'subway') subwayBg(ctx, W, H, camX, t, lowFx);
+  else templeBg(ctx, W, H, camX, t, lowFx);
 };
 
 /** Platforms and ground, styled per level. */
 FF.drawPlatform = function (ctx, p, theme, isGround) {
-  // Platform colours are picked to stand out from their own background — in
-  // Ramen Alley especially, brown-on-brown was impossible to read.
   const top = {
     neon: '#5a6076', ramen: '#e0ad69', subway: '#5b6480', temple: '#b8c7a6',
   }[theme];
@@ -628,12 +638,10 @@ FF.drawPlatform = function (ctx, p, theme, isGround) {
   ctx.fillRect(p.x, p.y, p.w, 3);
 
   if (isGround && theme === 'neon') {
-    // Shibuya crosswalk stripes
     ctx.fillStyle = 'rgba(255,255,255,.5)';
     for (let x = p.x; x < p.x + p.w; x += 74) ctx.fillRect(x, p.y + 16, 40, 8);
   }
   if (isGround && theme === 'subway') {
-    // yellow safety line
     ctx.fillStyle = '#f0c419';
     ctx.fillRect(p.x, p.y + 15, p.w, 5);
   }

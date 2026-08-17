@@ -9,17 +9,26 @@ var FF = window.FF || (window.FF = {});
   const ctx = canvas.getContext('2d');
   let dpr = 1;
 
+  const btnBump = document.getElementById('bBump');
+  const btnSlurp = document.getElementById('bSlurp');
+
   function resize() {
-    dpr = Math.min(2, window.devicePixelRatio || 1);
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
+    // Profiling showed the game's own per-frame work is well under a
+    // millisecond — the cost on a slow device is filling pixels, not running
+    // code. So the thing worth controlling is how many pixels there are. A 2x
+    // backing store means 1920x1080 of fill every frame for art that gains
+    // nothing from it, and dropping to 1x when the device is struggling more
+    // than halves the work again.
+    dpr = G.lowFx ? 1 : Math.min(1.5, window.devicePixelRatio || 1);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
     const pad = document.body.classList.contains('touch') ? 8 : 24;
     const s = Math.min((innerWidth - pad) / W, (innerHeight - pad) / H);
     canvas.style.width = (W * s) + 'px';
     canvas.style.height = (H * s) + 'px';
   }
   addEventListener('resize', resize);
-  resize();
+  // NB: the first resize() happens after G exists — it reads G.lowFx.
 
   // ------------------------------------------------------------- game state
   const G = {
@@ -32,6 +41,7 @@ var FF = window.FF || (window.FF = {});
     jeff: null,
     shield: null,
     ninjas: [],
+    thrown: [],          // bananas the ninjas have lobbed
     pick: null,
     key: null,
     boss: null,
@@ -42,7 +52,6 @@ var FF = window.FF || (window.FF = {});
     slowmo: 0,
     shake: 0,
     intro: 0,
-    banner: null,
     bannerT: 0,
     parts: [],
     texts: [],
@@ -52,8 +61,10 @@ var FF = window.FF || (window.FF = {});
     train: null,
     crumble: null,
     flash: 0,
+    lowFx: false,        // set automatically when the device can't keep up
   };
   FF.G = G;
+  resize();
 
   // ------------------------------------------------------------- effects
   function popText(str, x, y, color) {
@@ -62,7 +73,8 @@ var FF = window.FF || (window.FF = {});
   G.popText = popText;
 
   function burst(x, y, color, n) {
-    for (let i = 0; i < (n || 12); i++) {
+    const count = Math.round((n || 12) * (G.lowFx ? 0.4 : 1));
+    for (let i = 0; i < count; i++) {
       const a = Math.random() * Math.PI * 2;
       const sp = 1.5 + Math.random() * 3.5;
       G.parts.push({
@@ -72,63 +84,7 @@ var FF = window.FF || (window.FF = {});
     }
   }
 
-  // ------------------------------------------------------------- level setup
-  function loadLevel(i) {
-    const spec = FF.LEVELS[i];
-    const lvl = Object.assign({}, spec);
-    lvl.solids = [{ x: 0, y: spec.groundY, w: spec.width, h: 70 }].concat(spec.platforms);
-    G.level = lvl;
-    G.levelIndex = i;
-
-    G.jeff.reset(lvl);
-    G.shield.reset();
-    G.pick = FF.buildPickups(spec);
-    G.ninjas = (spec.ninjas || []).map((n) => new FF.Ninja(n));
-    G.hunger = 0;
-    G.hungerTarget = FF.hungerTarget(G.pick.food);
-    G.key = null;
-    G.boss = null;
-    G.magnet = 0;
-    G.slowmo = 0;
-    G.camX = 0;
-    G.parts.length = 0;
-    G.texts.length = 0;
-    G.intro = 150;
-
-    // pedestrians
-    G.walkers = [];
-    for (let k = 0; k < (spec.walkers || 0); k++) {
-      G.walkers.push({
-        x: 200 + Math.random() * (spec.width - 400),
-        dir: Math.random() < 0.5 ? -1 : 1,
-        sp: 0.6 + Math.random() * 0.9,
-        hue: Math.floor(Math.random() * 360),
-        h: 46 + Math.random() * 16,
-      });
-    }
-    // cherry blossom petals
-    G.petals = [];
-    if (spec.petals) {
-      for (let k = 0; k < 40; k++) {
-        G.petals.push({ x: Math.random() * W, y: Math.random() * H, sp: 0.5 + Math.random(), sw: Math.random() * 6, ph: Math.random() * 6 });
-      }
-    }
-    // ramen steam
-    G.steam = [];
-    if (spec.steam) {
-      for (let k = 0; k < 26; k++) {
-        G.steam.push({ x: Math.random() * spec.width, y: spec.groundY - Math.random() * 200, r: 12 + Math.random() * 26, sp: 0.3 + Math.random() * 0.5 });
-      }
-    }
-    // bullet train
-    G.train = spec.train ? { timer: spec.train.every, active: false, x: 0, warn: 0 } : null;
-
-    FF.audio.startMusic(spec.music || 1);
-  }
-
   // ------------------------------------------------------------- best score
-  // Remembered in the browser, same as the character pick. Wrapped in try/catch
-  // because private browsing can make localStorage throw.
   const BEST_KEY = 'foodfun.best';
 
   function loadBest() {
@@ -146,7 +102,6 @@ var FF = window.FF || (window.FF = {});
 
   let best = loadBest();
 
-  /** Keep the furthest level, the most chopsticks, and whether he's ever won. */
   function recordBest(beaten) {
     best = {
       level: Math.max(best ? best.level : 0, G.levelIndex),
@@ -154,6 +109,57 @@ var FF = window.FF || (window.FF = {});
       beaten: (best && best.beaten) || !!beaten,
     };
     try { localStorage.setItem(BEST_KEY, JSON.stringify(best)); } catch (e) { /* ignore */ }
+  }
+
+  // ------------------------------------------------------------- level setup
+  function loadLevel(i) {
+    const spec = FF.LEVELS[i];
+    const lvl = Object.assign({}, spec);
+    lvl.solids = [{ x: 0, y: spec.groundY, w: spec.width, h: 70 }].concat(spec.platforms);
+    G.level = lvl;
+    G.levelIndex = i;
+
+    G.jeff.reset(lvl);
+    G.shield.reset();
+    G.pick = FF.buildPickups(spec);
+    G.ninjas = (spec.ninjas || []).map((n) => new FF.Ninja(n, spec.throwingNinjas));
+    G.thrown = [];
+    G.hunger = 0;
+    G.hungerTarget = FF.hungerTarget(G.pick.food);
+    G.key = null;
+    G.boss = null;
+    G.magnet = 0;
+    G.slowmo = 0;
+    G.camX = 0;
+    G.parts.length = 0;
+    G.texts.length = 0;
+    G.intro = 150;
+
+    G.walkers = [];
+    for (let k = 0; k < (spec.walkers || 0); k++) {
+      G.walkers.push({
+        x: 200 + Math.random() * (spec.width - 400),
+        dir: Math.random() < 0.5 ? -1 : 1,
+        sp: 0.6 + Math.random() * 0.9,
+        hue: Math.floor(Math.random() * 360),
+        h: 46 + Math.random() * 16,
+      });
+    }
+    G.petals = [];
+    if (spec.petals) {
+      for (let k = 0; k < 40; k++) {
+        G.petals.push({ x: Math.random() * W, y: Math.random() * H, sp: 0.5 + Math.random(), ph: Math.random() * 6 });
+      }
+    }
+    G.steam = [];
+    if (spec.steam) {
+      for (let k = 0; k < 26; k++) {
+        G.steam.push({ x: Math.random() * spec.width, y: spec.groundY - Math.random() * 200, r: 12 + Math.random() * 26, sp: 0.3 + Math.random() * 0.5 });
+      }
+    }
+    G.train = spec.train ? { timer: spec.train.every, active: false, x: 0, warn: 0 } : null;
+
+    FF.audio.startMusic(spec.music || 'neon');
   }
 
   function startRun() {
@@ -187,7 +193,6 @@ var FF = window.FF || (window.FF = {});
     recordBest(false);
     FF.audio.stopMusic();
     FF.audio.play('rumble');
-    // Gavin's game over: Jeff's belly rumbles so loud the screen cracks apart.
     const snap = document.createElement('canvas');
     snap.width = W; snap.height = H;
     snap.getContext('2d').drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, W, H);
@@ -234,7 +239,6 @@ var FF = window.FF || (window.FF = {});
     if (G.flash > 0) G.flash--;
 
     if (G.state === 'title') {
-      // ← and → flip through Jeff's looks; anything else starts the game
       if (FF.input.tapped('left')) { FF.setLook(FF.lookIndex - 1); FF.audio.unlock(); FF.audio.play('eat'); }
       if (FF.input.tapped('right')) { FF.setLook(FF.lookIndex + 1); FF.audio.unlock(); FF.audio.play('eat'); }
       if (FF.input.anyTapped()) { FF.audio.unlock(); startRun(); }
@@ -246,7 +250,7 @@ var FF = window.FF || (window.FF = {});
         if (G.crumble.t < c.delay) continue;
         c.x += c.vx; c.y += c.vy; c.vy += 0.42; c.rot += c.vr;
       }
-      if (G.crumble.t > 110 && FF.input.anyTapped()) { G.state = 'title'; }
+      if (G.crumble.t > 110 && FF.input.anyTapped()) G.state = 'title';
       return;
     }
     if (G.state === 'victory') {
@@ -256,11 +260,11 @@ var FF = window.FF || (window.FF = {});
     }
     if (G.state === 'levelclear') {
       G.bannerT++;
-      for (let i = 0; i < 2; i++) {
+      if (!G.lowFx) {
         burst(Math.random() * W + G.camX, 120 + Math.random() * 160, 'hsl(' + Math.floor(Math.random() * 360) + ',90%,65%)', 1);
       }
       updateParticles(1);
-      if (G.bannerT > 110) {
+      if (G.bannerT > 130) {
         const next = G.levelIndex + 1;
         if (next >= FF.LEVELS.length) { recordBest(true); G.state = 'victory'; G.bannerT = 0; }
         else { G.jeff.grow(); loadLevel(next); recordBest(false); G.state = 'play'; }
@@ -274,7 +278,16 @@ var FF = window.FF || (window.FF = {});
     if (G.intro > 0) G.intro--;
     if (G.slowmo > 0) G.slowmo--;
     if (G.magnet > 0) G.magnet--;
-    const ts = G.slowmo > 0 ? 0.38 : 1; // Slow-Mo Slushie affects everything but Jeff
+    const ts = G.slowmo > 0 ? 0.38 : 1;
+
+    // Pressing the action button while a chomp is banked launches Jeff at the
+    // dragon instead of belly bumping. Jeff.update sees chomp > 0 first, so the
+    // bump never fires on the same press.
+    const bossReady = G.boss && G.boss.canChomp() && G.boss.onScreen(G.camX, W);
+    if (bossReady && FF.input.tapped('bump') && j.chomp <= 0) {
+      j.startChomp(G.boss.x, G.boss.y);
+      popText('CHOMP!', j.cx, j.y - 30, '#9dffb0');
+    }
 
     j.update(lvl, FF.input);
     const bobWasGone = !G.shield.active;
@@ -308,7 +321,7 @@ var FF = window.FF || (window.FF = {});
       }
     }
 
-    // ---- bananas (Gavin's rule: a banana costs a life) ----
+    // ---- bananas on the ground ----
     for (const b of G.pick.bananas) {
       if (b.dead) continue;
       if (Math.hypot(j.cx - b.x, j.cy - b.y) < b.r + j.w * 0.42) {
@@ -318,6 +331,17 @@ var FF = window.FF || (window.FF = {});
         burst(b.x, b.y, '#ffe14b', 14);
         hurtJeff(b.x, 'BANANA! -1');
       }
+    }
+
+    // ---- bananas in the air (thrown by ninjas) ----
+    FF.updateThrown(G.thrown, ts, lvl.groundY);
+    for (let i = G.thrown.length - 1; i >= 0; i--) {
+      const b = G.thrown[i];
+      if (Math.hypot(j.cx - b.x, j.cy - b.y) > 16 + j.w * 0.4) continue;
+      G.thrown.splice(i, 1);
+      burst(b.x, b.y, '#ffe14b', 12);
+      if (j.star > 0) continue;
+      hurtJeff(b.x, 'BANANA! -1');
     }
 
     // ---- special items ----
@@ -339,6 +363,10 @@ var FF = window.FF || (window.FF = {});
         G.slowmo = 330;
         FF.audio.play('big');
         popText('BRAIN FREEZE! SLOW-MO', it.x, it.y - 34, '#7fe4ff');
+      } else if (it.t === 'energy') {
+        j.energy = 480;
+        FF.audio.play('energy');
+        popText('⚡ ENERGY DRINK — GO FAST!', it.x, it.y - 34, '#b6ff3d');
       } else if (it.t === 'chopsticks') {
         G.chopsticks++;
         FF.audio.play('key');
@@ -348,10 +376,10 @@ var FF = window.FF || (window.FF = {});
 
     // ---- ninjas ----
     for (const n of G.ninjas) {
-      n.update(j, ts, lvl.groundY);
+      n.update(j, ts, lvl.groundY, G.thrown);
       if (n.dead || n.flying) continue;
       if (!n.hits(j)) continue;
-      if (j.star > 0 || j.bump > 0) {
+      if (j.star > 0 || j.bump > 0 || j.chomp > 0) {
         n.knockFlying(Math.sign(j.vx) || j.face);
         burst(n.cx, n.cy, '#ffe14b', 14);
         popText(j.star > 0 ? 'SMASH!' : 'BELLY BUMP!', n.cx, n.cy - 30, '#ffd166');
@@ -362,15 +390,12 @@ var FF = window.FF || (window.FF = {});
     }
     G.ninjas = G.ninjas.filter((n) => !n.dead);
 
-    // ---- bullet train ----
     if (G.train) updateTrain(ts, lvl, j);
 
-    // ---- pedestrians ----
     for (const wk of G.walkers) {
       wk.x += wk.dir * wk.sp * ts;
       if (wk.x < 60) wk.dir = 1;
       if (wk.x > lvl.width - 60) wk.dir = -1;
-      // they just bump you, they're not dangerous
       if (Math.abs(wk.x - j.cx) < 22 && Math.abs(lvl.groundY - (j.y + j.h)) < 6) {
         j.x += wk.dir * 1.1;
       }
@@ -382,11 +407,17 @@ var FF = window.FF || (window.FF = {});
       FF.audio.play('key');
       burst(j.cx, j.cy, '#ffd60a', 26);
       if (lvl.boss) {
+        // one-on-one with the dragon: the ninjas clear out
+        for (const n of G.ninjas) burst(n.cx, n.cy, '#ffe14b', 12);
+        if (G.ninjas.length) popText('THE NINJAS RUN AWAY!', j.cx, j.y - 56, '#ffe14b');
+        G.ninjas = [];
+        G.thrown = [];
         spawnBoss(lvl);
       } else {
         G.state = 'levelclear';
         G.bannerT = 0;
-        FF.audio.play('win');
+        FF.audio.stopMusic();
+        FF.audio.fanfare();
       }
     }
 
@@ -402,20 +433,19 @@ var FF = window.FF || (window.FF = {});
         G.state = 'victory';
         G.bannerT = 0;
       } else {
-        if (G.boss.seedHits(j)) hurtJeff(G.boss.x, 'SEED! -1');
-        if (G.boss.touching(j)) {
-          if (G.boss.chomps > 0) {
-            G.boss.bite(G);
-            j.vx = Math.sign(j.cx - G.boss.x) * 7;
-            j.vy = -7;
-            j.invuln = 40;
-            G.shake = 16;
-            burst(G.boss.x, G.boss.y, '#ff9ecb', 22);
-          } else if (j.star > 0) {
-            // star power still can't eat him — you need a strawberry
-            j.vx = Math.sign(j.cx - G.boss.x) * 6;
-          } else {
-            hurtJeff(G.boss.x, 'TOO SPIKY! -1');
+        if (j.chomp > 0 && G.boss.touching(j)) {
+          G.boss.bite(G);
+          j.chomp = 0;
+          j.vx = Math.sign(j.cx - G.boss.x) * 7 || -7;
+          j.vy = -7;
+          j.invuln = 50;
+          G.shake = 18;
+          burst(G.boss.x, G.boss.y, '#ff9ecb', 22);
+        } else if (j.chomp <= 0) {
+          if (G.boss.seedHits(j)) hurtJeff(G.boss.x, 'SEED! -1');
+          if (G.boss.touching(j)) {
+            if (j.star > 0) j.vx = Math.sign(j.cx - G.boss.x) * 6;
+            else hurtJeff(G.boss.x, 'TOO SPIKY! -1');
           }
         }
       }
@@ -423,9 +453,30 @@ var FF = window.FF || (window.FF = {});
 
     updateParticles(ts);
 
-    // camera
     const targetCam = Math.max(0, Math.min(lvl.width - W, j.cx - W * 0.42));
     G.camX += (targetCam - G.camX) * 0.12;
+
+    syncButtons(bossReady);
+  }
+
+  /** Keep the on-screen buttons telling the truth about what's available. */
+  function syncButtons(bossReady) {
+    if (btnBump) {
+      const ico = btnBump.querySelector('.ico');
+      const lab = btnBump.querySelector('small');
+      if (bossReady) {
+        btnBump.classList.add('chomp');
+        btnBump.classList.remove('dim');
+        if (ico) ico.textContent = '🐉';
+        if (lab) lab.textContent = 'CHOMP';
+      } else {
+        btnBump.classList.remove('chomp');
+        btnBump.classList.toggle('dim', !!(G.boss && !bossReady));
+        if (ico) ico.textContent = '💥';
+        if (lab) lab.textContent = 'BUMP';
+      }
+    }
+    if (btnSlurp) btnSlurp.classList.toggle('dim', !G.jeff.slurpReady());
   }
 
   function spawnKey() {
@@ -437,8 +488,8 @@ var FF = window.FF || (window.FF = {});
   }
 
   function spawnBoss(lvl) {
-    G.boss = new FF.Boss(lvl.boss, lvl.arenaStart, lvl.width - 40, lvl.groundY);
-    FF.audio.startMusic(2);
+    G.boss = new FF.Boss(lvl.boss, lvl.arenaStart, lvl.width - 40, lvl.groundY, lvl.strawberrySpots);
+    FF.audio.startMusic('boss');
     popText('THE DRAGON FRUIT BOSS!', G.jeff.cx, G.jeff.y - 50, '#ff5fa2');
     G.shake = 20;
   }
@@ -489,24 +540,31 @@ var FF = window.FF || (window.FF = {});
     const shakeX = (Math.random() - 0.5) * G.shake;
     const shakeY = (Math.random() - 0.5) * G.shake;
     const lvl = G.level;
+    const low = G.lowFx;
 
-    FF.drawBackground(ctx, lvl.theme, W, H, G.camX, G.t);
+    FF.drawBackground(ctx, lvl.theme, W, H, G.camX, G.t, low);
 
     ctx.save();
     ctx.translate(-G.camX + shakeX, shakeY);
 
-    for (const p of lvl.solids) FF.drawPlatform(ctx, p, lvl.theme, p.y === lvl.groundY);
+    // Only draw what the camera can actually see. A level holds around a
+    // hundred snacks and most of them are nowhere near the screen.
+    const left = G.camX - 80, right = G.camX + W + 80;
+    const seen = (x) => x > left && x < right;
 
-    // pedestrians (behind everything else)
-    for (const wk of G.walkers) drawWalker(wk, lvl);
+    for (const p of lvl.solids) {
+      if (p.x + p.w > left && p.x < right) FF.drawPlatform(ctx, p, lvl.theme, p.y === lvl.groundY);
+    }
+    for (const wk of G.walkers) if (seen(wk.x)) drawWalker(wk, lvl);
 
-    for (const f of G.pick.food) FF.drawPickup(ctx, f, G.t);
-    for (const b of G.pick.bananas) FF.drawPickup(ctx, b, G.t);
-    for (const it of G.pick.items) FF.drawPickup(ctx, it, G.t);
-    if (G.key) FF.drawKey(ctx, G.key, G.t);
+    for (const f of G.pick.food) if (seen(f.x)) FF.drawPickup(ctx, f, G.t, low);
+    for (const b of G.pick.bananas) if (seen(b.x)) FF.drawPickup(ctx, b, G.t, low);
+    for (const it of G.pick.items) if (seen(it.x)) FF.drawPickup(ctx, it, G.t, low);
+    if (G.key) FF.drawKey(ctx, G.key, G.t, low);
 
-    for (const n of G.ninjas) n.draw(ctx, G.t);
-    if (G.boss) G.boss.draw(ctx, G.t);
+    for (const n of G.ninjas) if (seen(n.x)) n.draw(ctx, G.t);
+    FF.drawThrown(ctx, G.thrown);
+    if (G.boss) G.boss.draw(ctx, G.t, low);
 
     if (G.train && G.train.active) drawTrain(lvl);
 
@@ -526,25 +584,16 @@ var FF = window.FF || (window.FF = {});
     }
     ctx.globalAlpha = 1;
 
-    if (lvl.steam) drawSteam(lvl);
+    if (lvl.steam && !low) drawSteam(lvl);
     ctx.restore();
 
-    if (lvl.petals) drawPetals();
-    if (G.slowmo > 0) {
-      ctx.fillStyle = 'rgba(120,220,255,.12)';
-      ctx.fillRect(0, 0, W, H);
-    }
-    if (G.jeff.star > 0) {
-      ctx.fillStyle = 'hsla(' + (G.t * 8) % 360 + ',100%,60%,.09)';
-      ctx.fillRect(0, 0, W, H);
-    }
-    if (G.flash > 0) {
-      ctx.fillStyle = 'rgba(255,60,90,' + (G.flash / 26) + ')';
-      ctx.fillRect(0, 0, W, H);
-    }
+    if (lvl.petals && !low) drawPetals();
+    if (G.slowmo > 0) { ctx.fillStyle = 'rgba(120,220,255,.12)'; ctx.fillRect(0, 0, W, H); }
+    if (G.jeff.star > 0) { ctx.fillStyle = 'hsla(' + (G.t * 8) % 360 + ',100%,60%,.09)'; ctx.fillRect(0, 0, W, H); }
+    if (G.jeff.energy > 0 && !low) drawSpeedLines();
+    if (G.flash > 0) { ctx.fillStyle = 'rgba(255,60,90,' + (G.flash / 26) + ')'; ctx.fillRect(0, 0, W, H); }
     if (G.train && G.train.warn > 0 && !G.train.active) {
-      const a = 0.18 + 0.18 * Math.sin(G.t * 0.4);
-      ctx.fillStyle = 'rgba(255,60,60,' + a + ')';
+      ctx.fillStyle = 'rgba(255,60,60,' + (0.18 + 0.18 * Math.sin(G.t * 0.4)) + ')';
       ctx.fillRect(0, 0, W, H);
       FF.text(ctx, '⚠ TRAIN COMING — GET UP HIGH!', W / 2, 64, 30, '#fff');
     }
@@ -553,6 +602,19 @@ var FF = window.FF || (window.FF = {});
     if (G.intro > 0) drawIntro();
     if (G.state === 'levelclear') drawLevelClear();
     if (G.state === 'victory') drawVictory();
+  }
+
+  function drawSpeedLines() {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(182,255,61,.35)';
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 7; i++) {
+      const y = (i * 97 + (G.t * 11) % 97) % H;
+      const len = 40 + (i % 3) * 30;
+      const x = (W - ((G.t * 22 + i * 260) % (W + 300)));
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function drawWalker(wk, lvl) {
@@ -580,13 +642,11 @@ var FF = window.FF || (window.FF = {});
     ctx.fillStyle = '#1b6ce0';
     ctx.fillRect(tr.x, y + 34, 620, 12);
     ctx.fillStyle = '#0f2a52';
-    for (let k = 0; k < 8; k++) FF.rr(ctx, tr.x + 40 + k * 70, y + 12, 44, 20, 4), ctx.fill();
-    // nose
+    for (let k = 0; k < 8; k++) { FF.rr(ctx, tr.x + 40 + k * 70, y + 12, 44, 20, 4); ctx.fill(); }
     ctx.fillStyle = '#e9edf5';
     ctx.beginPath();
     ctx.moveTo(tr.x, y + 6); ctx.quadraticCurveTo(tr.x - 70, y + 20, tr.x - 60, y + 58);
     ctx.lineTo(tr.x, y + 58); ctx.closePath(); ctx.fill();
-    // speed lines
     ctx.strokeStyle = 'rgba(255,255,255,.6)';
     ctx.lineWidth = 3;
     for (let k = 0; k < 6; k++) {
@@ -611,11 +671,11 @@ var FF = window.FF || (window.FF = {});
   function drawPetals() {
     ctx.save();
     ctx.fillStyle = '#ffb7d5';
+    ctx.globalAlpha = 0.75;
     for (const p of G.petals) {
       p.y += p.sp;
       p.x += Math.sin((G.t + p.ph * 40) * 0.02) * 0.8;
       if (p.y > H) { p.y = -10; p.x = Math.random() * W; }
-      ctx.globalAlpha = 0.75;
       FF.oval(ctx, p.x, p.y, 5, 3.2); ctx.fill();
     }
     ctx.restore();
@@ -623,7 +683,6 @@ var FF = window.FF || (window.FF = {});
 
   // ------------------------------------------------------------- HUD
   function drawHUD() {
-    // lives
     for (let i = 0; i < Math.min(G.lives, 8); i++) FF.emoji(ctx, '❤️', 30 + i * 30, 32, 26, '#ff4b6b');
     if (G.lives > 8) FF.text(ctx, 'x' + G.lives, 30 + 8 * 30, 32, 18, '#fff');
 
@@ -643,7 +702,7 @@ var FF = window.FF || (window.FF = {});
     FF.emoji(ctx, p >= 1 ? '😋' : '🍜', bx + bw + 20, by + bh / 2, 24, '#ffd166');
     FF.text(ctx, p >= 1 ? 'FULL!' : 'HUNGRY', bx + bw / 2, by + bh / 2, 14, '#fff');
 
-    // shield charge
+    // Bob's shield charge
     const sx = 26, sy = 88;
     ctx.fillStyle = 'rgba(0,0,0,.45)';
     FF.rr(ctx, sx, sy, 150, 12, 6); ctx.fill();
@@ -652,20 +711,27 @@ var FF = window.FF || (window.FF = {});
     FF.rr(ctx, sx + 2, sy + 2, (150 - 4) * c, 8, 4); ctx.fill();
     FF.text(ctx, G.shield.active ? '🌈 BOB IS READY' : 'BOB IS COMING BACK…', sx + 75, sy + 6, 10, '#fff');
 
-    // right side
+    // slurp recharge
+    const ux = 26, uy = 106;
+    const ready = G.jeff.slurpReady();
+    const charge = ready ? 1 : 1 - G.jeff.slurpCool / FF.SLURP_COOL;
+    ctx.fillStyle = 'rgba(0,0,0,.45)';
+    FF.rr(ctx, ux, uy, 150, 12, 6); ctx.fill();
+    ctx.fillStyle = ready ? '#bfe9ff' : '#5a7f96';
+    FF.rr(ctx, ux + 2, uy + 2, (150 - 4) * charge, 8, 4); ctx.fill();
+    FF.text(ctx, ready ? '🌀 SLURP READY' : 'SLURP ' + Math.ceil(G.jeff.slurpCool / 60) + 's', ux + 75, uy + 6, 10, '#fff');
+
     FF.text(ctx, G.level.name, W - 24, 30, 20, '#fff', 'right');
     FF.text(ctx, 'LEVEL ' + (G.levelIndex + 1) + ' / ' + FF.LEVELS.length, W - 24, 52, 14, 'rgba(255,255,255,.8)', 'right');
     FF.emoji(ctx, '🥢', W - 40, 78, 22, '#ffd60a');
     FF.text(ctx, '× ' + G.chopsticks, W - 62, 78, 16, '#ffd60a', 'right');
 
-    if (G.jeff.star > 0) {
-      FF.text(ctx, '🍔 BIG MAC MODE! ' + Math.ceil(G.jeff.star / 60), W / 2, 26, 22, '#ffd166');
-    }
-    if (G.slowmo > 0) {
-      FF.text(ctx, '🍧 BRAIN FREEZE ' + Math.ceil(G.slowmo / 60), W / 2, 52, 18, '#7fe4ff');
-    }
+    let banner = 26;
+    if (G.jeff.star > 0) { FF.text(ctx, '🍔 BIG MAC MODE! ' + Math.ceil(G.jeff.star / 60), W / 2, banner, 22, '#ffd166'); banner += 26; }
+    if (G.jeff.energy > 0) { FF.text(ctx, '⚡ ENERGY DRINK! ' + Math.ceil(G.jeff.energy / 60), W / 2, banner, 20, '#b6ff3d'); banner += 24; }
+    if (G.slowmo > 0) { FF.text(ctx, '🍧 BRAIN FREEZE ' + Math.ceil(G.slowmo / 60), W / 2, banner, 18, '#7fe4ff'); }
 
-    // an arrow at the screen edge so you can always find the key
+    // key finder arrow
     if (G.key) {
       const kx = G.key.x - G.camX;
       if (kx < 40 || kx > W - 40) {
@@ -686,7 +752,7 @@ var FF = window.FF || (window.FF = {});
       }
     }
 
-    // boss health
+    // boss health + what to do next
     if (G.boss) {
       const w2 = 300;
       ctx.fillStyle = 'rgba(0,0,0,.5)';
@@ -694,9 +760,21 @@ var FF = window.FF || (window.FF = {});
       ctx.fillStyle = '#ff2d7a';
       FF.rr(ctx, W / 2 - w2 / 2 + 3, H - 43, (w2 - 6) * (G.boss.hp() / G.boss.maxHp()), 16, 8); ctx.fill();
       FF.text(ctx, 'DRAGON FRUIT BOSS', W / 2, H - 35, 14, '#fff');
-      FF.text(ctx,
-        G.boss.chomps > 0 ? 'CHOMP HIM NOW!' : 'FIND A 🍓 STRAWBERRY TO BITE HIM!',
-        W / 2, H - 82, 18, G.boss.chomps > 0 ? '#9dffb0' : '#ffd166');
+
+      const touch = document.body.classList.contains('touch');
+      if (G.boss.canChomp()) {
+        const secs = G.boss.chompLeft.toFixed(1);
+        FF.text(ctx, (touch ? 'TAP 🐉 CHOMP' : 'PRESS X — CHOMP!') + '   ' + secs + 's',
+          W / 2, H - 84, 26, '#9dffb0');
+        // countdown bar
+        const cw = 260;
+        ctx.fillStyle = 'rgba(0,0,0,.45)';
+        FF.rr(ctx, W / 2 - cw / 2, H - 66, cw, 9, 5); ctx.fill();
+        ctx.fillStyle = '#9dffb0';
+        FF.rr(ctx, W / 2 - cw / 2 + 2, H - 64, (cw - 4) * (G.boss.window / FF.CHOMP_WINDOW), 5, 3); ctx.fill();
+      } else {
+        FF.text(ctx, 'FIND A 🍓 STRAWBERRY TO BITE HIM!', W / 2, H - 82, 18, '#ffd166');
+      }
     }
   }
 
@@ -713,15 +791,20 @@ var FF = window.FF || (window.FF = {});
   function drawLevelClear() {
     ctx.fillStyle = 'rgba(0,0,0,.55)';
     ctx.fillRect(0, 0, W, H);
-    FF.text(ctx, '🔑 KEY GET!', W / 2, H / 2 - 40, 56, '#ffd60a');
-    FF.text(ctx, 'Jeff is full — and a little bit bigger!', W / 2, H / 2 + 20, 22, '#fff');
-    FF.emoji(ctx, '🍜🥤🌭', W / 2, H / 2 + 70, 40, '#ffd166');
+    const pop = Math.min(1, G.bannerT / 12);
+    ctx.save();
+    ctx.translate(W / 2, H / 2 - 40);
+    ctx.scale(pop, pop);
+    FF.text(ctx, '🔑 KEY GET!', 0, 0, 56, '#ffd60a');
+    ctx.restore();
+    FF.text(ctx, 'LEVEL COMPLETE!', W / 2, H / 2 + 16, 30, '#9dffb0');
+    FF.text(ctx, 'Jeff is full — and a little bit bigger!', W / 2, H / 2 + 56, 20, '#fff');
+    FF.emoji(ctx, '🍜🥤🌭', W / 2, H / 2 + 100, 40, '#ffd166');
   }
 
   function drawVictory() {
     ctx.fillStyle = 'rgba(10,4,20,.82)';
     ctx.fillRect(0, 0, W, H);
-    const t = G.bannerT;
     FF.text(ctx, 'YOU ATE THE DRAGON FRUIT BOSS!', W / 2, 130, 40, '#ff9ecb');
     FF.emoji(ctx, '🐉', W / 2 - 120, 210, 70, '#ff5fa2');
     FF.emoji(ctx, '😋', W / 2, 210, 80, '#ffd166');
@@ -729,7 +812,7 @@ var FF = window.FF || (window.FF = {});
     FF.text(ctx, 'Jeff is not hungry anymore.', W / 2, 290, 24, '#fff');
     FF.text(ctx, 'Golden Chopsticks found: ' + G.chopsticks + ' / ' + FF.LEVELS.length, W / 2, 330, 22, '#ffd60a');
     FF.text(ctx, 'Lives left: ' + G.lives, W / 2, 362, 20, '#9dffb0');
-    if (t > 90 && Math.floor(t / 30) % 2 === 0) {
+    if (G.bannerT > 90 && Math.floor(G.bannerT / 30) % 2 === 0) {
       FF.text(ctx, 'PRESS ANY KEY OR TAP TO PLAY AGAIN', W / 2, 440, 20, '#fff');
     }
     for (let i = 0; i < 2; i++) {
@@ -751,10 +834,8 @@ var FF = window.FF || (window.FF = {});
     const cr = G.crumble;
     ctx.fillStyle = '#0a0710';
     ctx.fillRect(0, 0, W, H);
-    const sx = (Math.random() - 0.5) * G.shake;
-    const sy = (Math.random() - 0.5) * G.shake;
     ctx.save();
-    ctx.translate(sx, sy);
+    ctx.translate((Math.random() - 0.5) * G.shake, (Math.random() - 0.5) * G.shake);
     for (const c of cr.chunks) {
       ctx.save();
       ctx.translate(c.x + c.w / 2, c.y + c.h / 2);
@@ -762,7 +843,6 @@ var FF = window.FF || (window.FF = {});
       ctx.drawImage(cr.snap, c.sx, c.sy, c.w, c.h, -c.w / 2, -c.h / 2, c.w, c.h);
       ctx.restore();
     }
-    // cracks spider out from the middle while it falls apart
     if (cr.t < 60) {
       ctx.strokeStyle = 'rgba(255,255,255,.85)';
       ctx.lineWidth = 3;
@@ -788,14 +868,13 @@ var FF = window.FF || (window.FF = {});
   }
 
   // ------------------------------------------------------------- title
-  const titleJeff = { x: 0, y: 0, w: 110, h: 115, scale: 2.6, face: 1, vx: 0, vy: 0, onGround: true, squash: 0, slurping: false, star: 0 };
+  const titleJeff = { x: 0, y: 0, w: 110, h: 115, scale: 2.6, face: 1, vx: 0, vy: 0, onGround: true, squash: 0, slurping: false, star: 0, chomp: 0 };
 
   function drawTitle() {
-    FF.drawBackground(ctx, 'neon', W, H, G.t * 0.35, G.t);
+    FF.drawBackground(ctx, 'neon', W, H, G.t * 0.35, G.t, G.lowFx);
     ctx.fillStyle = 'rgba(6,4,16,.45)';
     ctx.fillRect(0, 0, W, H);
 
-    // best score so far — nothing shows on a first-ever visit
     if (best) {
       const line = best.beaten
         ? '🏆 YOU BEAT THE DRAGON FRUIT BOSS!   🥢 ' + best.chopsticks + ' / ' + FF.LEVELS.length
@@ -806,7 +885,6 @@ var FF = window.FF || (window.FF = {});
       FF.text(ctx, line, W / 2, 43, 17, best.beaten ? '#ffd60a' : '#9dffb0');
     }
 
-    // bobbing logo
     const bob = Math.sin(G.t * 0.05) * 8;
     ctx.save();
     ctx.translate(W / 2, 118 + bob);
@@ -815,24 +893,20 @@ var FF = window.FF || (window.FF = {});
     ctx.restore();
     FF.text(ctx, 'starring JEFF the sumo 🍜  &  BOB the rainbow bubble 🌈', W / 2, 176, 21, '#ff9ecb');
 
-    // Jeff waving on the title screen — this is also the character picker
     titleJeff.x = W / 2 - titleJeff.w / 2;
     titleJeff.y = 214 + Math.sin(G.t * 0.06) * 6;
     titleJeff.vy = Math.sin(G.t * 0.06) * 2;
     FF.drawJeff(ctx, titleJeff, G.t);
 
-    // floating snacks
     const snacks = ['🍜', '🥤', '🌭', '🍡', '🍣', '🍢'];
     for (let i = 0; i < snacks.length; i++) {
       const a = G.t * 0.012 + i * (Math.PI * 2 / snacks.length);
       FF.emoji(ctx, snacks[i], W / 2 + Math.cos(a) * 240, 300 + Math.sin(a) * 62, 34, '#ffe7c2');
     }
 
-    // ---- pick your Jeff ----
     const look = FF.look();
-    const arrowPulse = 0.6 + 0.4 * Math.sin(G.t * 0.1);
     ctx.save();
-    ctx.globalAlpha = arrowPulse;
+    ctx.globalAlpha = 0.6 + 0.4 * Math.sin(G.t * 0.1);
     FF.text(ctx, '◀', W / 2 - 150, 278, 44, '#9dffb0');
     FF.text(ctx, '▶', W / 2 + 150, 278, 44, '#9dffb0');
     ctx.restore();
@@ -858,8 +932,24 @@ var FF = window.FF || (window.FF = {});
   }
 
   // ------------------------------------------------------------- loop
-  // One bad frame should never end the game — log it and keep going.
-  function frame() {
+  // Watch how long frames are taking and quietly turn off the expensive effects
+  // if the device can't keep up, rather than just running slowly.
+  let frameAvg = 16.7;
+  let lastFrame = 0;
+
+  function frame(now) {
+    if (lastFrame) {
+      const dt = Math.min(200, now - lastFrame);
+      frameAvg = frameAvg * 0.93 + dt * 0.07;
+      const was = G.lowFx;
+      if (!G.lowFx && frameAvg > 26) G.lowFx = true;
+      else if (G.lowFx && frameAvg < 19) G.lowFx = false;
+      // dropping detail also drops the canvas resolution, which is the part
+      // that actually costs a slow device anything
+      if (was !== G.lowFx) resize();
+    }
+    lastFrame = now;
+
     try {
       update();
       render();
@@ -869,5 +959,5 @@ var FF = window.FF || (window.FF = {});
     FF.input.endFrame();
     requestAnimationFrame(frame);
   }
-  frame();
+  requestAnimationFrame(frame);
 })();

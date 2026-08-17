@@ -19,7 +19,7 @@ FF.buildPickups = function (level) {
   const food = level.food.map((f) => pickup(f.x, f.y, 'food', f.t, FF.FOOD[f.t].r));
   const bananas = (level.bananas || []).map((b) => pickup(b.x, b.y, 'banana', 'banana', 16));
   const items = (level.items || []).map((i) => pickup(i.x, i.y, 'item', i.t, FF.ITEMS[i.t].r));
-  return { food, bananas, items };
+  return { food: food, bananas: bananas, items: items };
 };
 
 /**
@@ -31,25 +31,48 @@ FF.hungerTarget = function (foods) {
   return Math.max(40, Math.round(total * 0.55));
 };
 
-FF.drawPickup = function (ctx, p, t) {
+// A soft glow, rendered once and stamped with drawImage. Building a fresh
+// radial gradient for every snack on every frame was a real cost on old tablets.
+let glowSprite = null;
+function glow() {
+  if (glowSprite) return glowSprite;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(32, 32, 2, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,240,200,.45)');
+  g.addColorStop(1, 'rgba(255,240,200,0)');
+  x.fillStyle = g;
+  x.fillRect(0, 0, 64, 64);
+  glowSprite = c;
+  return c;
+}
+
+const ITEM_GLOW = {
+  bigmac: '#ffb703', chopsticks: '#ffd60a', riceball: '#ffffff',
+  slowmo: '#7fe4ff', energy: '#b6ff3d',
+};
+
+FF.drawPickup = function (ctx, p, t, lowFx) {
   if (p.dead) return;
   const bob = Math.sin(t * 0.06 + p.phase) * 4;
   const y = p.y + bob;
 
   if (p.kind === 'item') {
-    // specials get a glow so they read as "rare"
-    const glow = { bigmac: '#ffb703', chopsticks: '#ffd60a', riceball: '#ffffff', slowmo: '#7fe4ff' }[p.t];
     ctx.save();
-    ctx.shadowColor = glow;
-    ctx.shadowBlur = 16 + Math.sin(t * 0.1 + p.phase) * 6;
+    if (!lowFx) {
+      ctx.shadowColor = ITEM_GLOW[p.t];
+      ctx.shadowBlur = 16 + Math.sin(t * 0.1 + p.phase) * 6;
+    }
     FF.emoji(ctx, FF.ITEMS[p.t].e, p.x, y, p.r * 2.1);
     ctx.restore();
-    // sparkles
-    ctx.fillStyle = 'rgba(255,255,255,.9)';
-    for (let i = 0; i < 3; i++) {
-      const a = t * 0.05 + i * 2.1 + p.phase;
-      FF.oval(ctx, p.x + Math.cos(a) * (p.r + 10), y + Math.sin(a) * (p.r + 8), 1.8, 1.8);
-      ctx.fill();
+    if (!lowFx) {
+      ctx.fillStyle = 'rgba(255,255,255,.9)';
+      for (let i = 0; i < 3; i++) {
+        const a = t * 0.05 + i * 2.1 + p.phase;
+        FF.oval(ctx, p.x + Math.cos(a) * (p.r + 10), y + Math.sin(a) * (p.r + 8), 1.8, 1.8);
+        ctx.fill();
+      }
     }
     return;
   }
@@ -58,7 +81,7 @@ FF.drawPickup = function (ctx, p, t) {
     ctx.save();
     ctx.translate(p.x, y);
     ctx.rotate(Math.sin(t * 0.04 + p.phase) * 0.12);
-    FF.emoji(ctx, '🍌', 0, 0, 34);
+    FF.emoji(ctx, '🍌', 0, 0, 34, '#ffe14b');
     // a little danger flash so it never feels unfair
     ctx.globalAlpha = 0.35 + 0.25 * Math.sin(t * 0.15 + p.phase);
     ctx.strokeStyle = '#ff3b5c';
@@ -70,30 +93,27 @@ FF.drawPickup = function (ctx, p, t) {
   }
 
   const f = FF.FOOD[p.t];
-  // a soft halo so snacks stay easy to see against dark buildings
-  ctx.save();
-  const halo = ctx.createRadialGradient(p.x, y, 2, p.x, y, f.r * 1.8);
-  halo.addColorStop(0, 'rgba(255,240,200,.42)');
-  halo.addColorStop(1, 'rgba(255,240,200,0)');
-  ctx.fillStyle = halo;
-  FF.oval(ctx, p.x, y, f.r * 1.8, f.r * 1.8); ctx.fill();
-  if (p.t === 'bento') {
+  if (!lowFx) {
+    const s = f.r * 3.6;
+    ctx.drawImage(glow(), p.x - s / 2, y - s / 2, s, s);
+  }
+  if (p.t === 'bento' && !lowFx) {
+    ctx.save();
     ctx.shadowColor = '#ff5fa2';
     ctx.shadowBlur = 16;
     FF.emoji(ctx, f.e, p.x, y, f.r * 2.2);
+    ctx.restore();
   } else {
-    FF.emoji(ctx, f.e, p.x, y, f.r * 2.1);
+    FF.emoji(ctx, f.e, p.x, y, f.r * (p.t === 'bento' ? 2.2 : 2.1));
   }
-  ctx.restore();
 };
 
 /** The key that appears once the hunger meter is full. */
-FF.drawKey = function (ctx, key, t) {
+FF.drawKey = function (ctx, key, t, lowFx) {
   const bob = Math.sin(t * 0.08) * 7;
   ctx.save();
-  ctx.shadowColor = '#ffd60a';
-  ctx.shadowBlur = 26 + Math.sin(t * 0.14) * 10;
-  FF.emoji(ctx, '🔑', key.x, key.y + bob, 46);
+  if (!lowFx) { ctx.shadowColor = '#ffd60a'; ctx.shadowBlur = 26 + Math.sin(t * 0.14) * 10; }
+  FF.emoji(ctx, '🔑', key.x, key.y + bob, 46, '#ffd60a');
   ctx.restore();
   // a ring of light so it's easy to spot from across the level
   ctx.strokeStyle = 'rgba(255,214,10,' + (0.25 + 0.2 * Math.sin(t * 0.1)) + ')';
