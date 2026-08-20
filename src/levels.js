@@ -78,9 +78,49 @@ function onPlat(p, n, t, lift) {
   return out;
 }
 
-/** A ninja standing guard on a platform. */
+/** A ninja standing guard on a platform. Platform guards are the ones that
+ *  throw bananas (on levels where throwing is switched on). */
 function guard(p, range) {
-  return { x: Math.round(p.x + 10), y: p.y - 40, range: range == null ? Math.max(30, p.w / 2 - 20) : range };
+  return {
+    x: Math.round(p.x + 10), y: p.y - 40,
+    range: range == null ? Math.max(30, p.w / 2 - 20) : range,
+    throws: true,
+  };
+}
+
+// A belly bump carries Jeff about this far. Mirrors BUMP_TIME/BUMP_SPEED in
+// src/jeff.js — tools/check-levels.js reads the real values and fails if these
+// drift apart, so this can't quietly go stale.
+const BUMP_TRAVEL = 128;
+const BANANA_SAFE = BUMP_TRAVEL + 40;
+
+/**
+ * True if a banana is far enough from every ninja. Parking a banana just behind
+ * a guard made the belly bump a trap: you land the hit, keep sliding, and eat
+ * the banana with no way to stop. Bananas are placed through this filter now.
+ */
+function clearOfNinjas(b, ninjas) {
+  return !ninjas.some((n) =>
+    Math.abs(b.y - (n.y + 20)) <= 60 &&
+    b.x > n.x - n.range + 15 - BANANA_SAFE &&
+    b.x < n.x + n.range + 15 + BANANA_SAFE);
+}
+
+/** Spread bananas along the ground, skipping anywhere a ninja is standing. */
+function groundBananas(width, ninjas, want) {
+  const out = [];
+  for (let x = 430; x < width - 260 && out.length < want; x += 170) {
+    const b = { x: x, y: GY - 34 };
+    if (clearOfNinjas(b, ninjas)) out.push(b);
+  }
+  return out;
+}
+
+/** A banana on top of a platform — dropped if that platform has a guard. */
+function platBananas(plats, ninjas) {
+  return plats
+    .map((p) => ({ x: Math.round(p.x + p.w / 2), y: p.y - 34 }))
+    .filter((b) => clearOfNinjas(b, ninjas));
 }
 
 /** A row of food along the ground. */
@@ -102,6 +142,16 @@ function arc(x, y, n, t, spread, lift) {
 
 // ============================================================ 1. NEON CROSSWALK
 const L1 = hill(380, 3).concat(hill(1180, 3), hill(1980, 4), stair(2680, 2));
+
+const L1N = [
+  guard(L1[2]), guard(L1[7]), guard(L1[13]),
+  { x: 1000, y: GY - 40, range: 150 },
+  { x: 2400, y: GY - 40, range: 150 },
+];
+// bananas are generated clear of every ninja, then a few on the
+// platforms nobody is guarding
+const L1B = groundBananas(3000, L1N, 5)
+  .concat(platBananas([L1[4], L1[9], L1[16]], L1N));
 
 const LEVEL1 = {
   name: 'Neon Crosswalk',
@@ -125,16 +175,8 @@ const LEVEL1 = {
     onPlat(L1[16], 3, 'corndog'),
     row(2760, GY - 40, 5, 50, 'ramen')
   ),
-  bananas: [
-    { x: 640, y: GY - 34 }, { x: 1120, y: GY - 34 }, { x: 1660, y: GY - 34 },
-    { x: 2260, y: GY - 34 }, { x: 2680, y: GY - 34 },
-    { x: L1[2].x + 100, y: L1[2].y - 34 }, { x: L1[7].x + 100, y: L1[7].y - 34 },
-  ],
-  ninjas: [
-    guard(L1[2]), guard(L1[7]), guard(L1[13]),
-    { x: 1000, y: GY - 40, range: 150 },
-    { x: 2400, y: GY - 40, range: 150 },
-  ],
+  bananas: L1B,
+  ninjas: L1N,
   items: [
     { x: L1[1].x + 65, y: L1[1].y - 78, t: 'chopsticks' },
     { x: L1[9].x + 65, y: L1[9].y - 40, t: 'bigmac' },
@@ -146,6 +188,17 @@ const LEVEL1 = {
 
 // =============================================================== 2. RAMEN ALLEY
 const L2 = hill(300, 4).concat(hill(1120, 3), hill(1820, 4), hill(2620, 3));
+
+const L2N = [
+  guard(L2[3]), guard(L2[9]), guard(L2[15]), guard(L2[21]),
+  { x: 900, y: GY - 40, range: 160 },
+  { x: 1650, y: GY - 40, range: 160 },
+  { x: 2450, y: GY - 40, range: 160 },
+];
+// bananas are generated clear of every ninja, then a few on the
+// platforms nobody is guarding
+const L2B = groundBananas(3200, L2N, 5)
+  .concat(platBananas([L2[5], L2[11], L2[17], L2[23]], L2N));
 
 const LEVEL2 = {
   name: 'Ramen Alley',
@@ -174,18 +227,8 @@ const LEVEL2 = {
     onPlat(L2[22], 3, 'sushi'), onPlat(L2[23], 3, 'ramen'),
     row(3050, GY - 40, 3, 50, 'ramen')
   ),
-  bananas: [
-    { x: 800, y: GY - 34 }, { x: 1060, y: GY - 34 }, { x: 1520, y: GY - 34 },
-    { x: 1780, y: GY - 34 }, { x: 2320, y: GY - 34 }, { x: 2560, y: GY - 34 },
-    { x: L2[3].x + 100, y: L2[3].y - 34 }, { x: L2[9].x + 100, y: L2[9].y - 34 },
-    { x: L2[15].x + 100, y: L2[15].y - 34 },
-  ],
-  ninjas: [
-    guard(L2[3]), guard(L2[9]), guard(L2[15]), guard(L2[21]),
-    { x: 900, y: GY - 40, range: 160 },
-    { x: 1650, y: GY - 40, range: 160 },
-    { x: 2450, y: GY - 40, range: 160 },
-  ],
+  bananas: L2B,
+  ninjas: L2N,
   items: [
     { x: L2[3].x + 65, y: L2[3].y - 80, t: 'chopsticks' },
     { x: L2[10].x + 65, y: L2[10].y - 40, t: 'bigmac' },
@@ -200,6 +243,16 @@ const LEVEL2 = {
 // The train sweeps the ground, so every hill here doubles as somewhere to hide.
 const L3 = hill(300, 3).concat(hill(1000, 3), hill(1700, 4), hill(2500, 3), stair(3150, 2));
 
+const L3N = [
+  guard(L3[2]), guard(L3[7]), guard(L3[13]), guard(L3[19]),
+  { x: 900, y: GY - 40, range: 150 },
+  { x: 2350, y: GY - 40, range: 150 },
+];
+// bananas are generated clear of every ninja, then a few on the
+// platforms nobody is guarding
+const L3B = groundBananas(3400, L3N, 4)
+  .concat(platBananas([L3[4], L3[10], L3[16]], L3N));
+
 const LEVEL3 = {
   name: 'Subway & Bullet Train',
   subtitle: 'Get off the ground when the lights flash!',
@@ -208,7 +261,9 @@ const LEVEL3 = {
   groundY: GY,
   music: 'subway',
   walkers: 5,
-  train: { every: 460, warn: 110, speed: 17 },
+  // every 12s with a 3s warning — it was every 7.7s with 1.8s,
+  // which left no time to find a platform
+  train: { every: 720, warn: 180, speed: 17 },
   throwingNinjas: true, // this level's ninjas lob bananas at you
   platforms: L3,
   food: [].concat(
@@ -227,19 +282,11 @@ const LEVEL3 = {
     onPlat(L3[20], 3, 'sushi'), onPlat(L3[21], 3, 'ramen'),
     onPlat(L3[22], 3, 'takoyaki'), onPlat(L3[23], 3, 'dango')
   ),
-  bananas: [
-    { x: 700, y: GY - 34 }, { x: 1400, y: GY - 34 }, { x: 2200, y: GY - 34 },
-    { x: 2980, y: GY - 34 },
-    { x: L3[2].x + 100, y: L3[2].y - 34 }, { x: L3[7].x + 100, y: L3[7].y - 34 },
-    { x: L3[13].x + 100, y: L3[13].y - 34 },
-  ],
-  ninjas: [
-    guard(L3[2]), guard(L3[7]), guard(L3[13]), guard(L3[19]),
-    { x: 900, y: GY - 40, range: 150 },
-    { x: 2350, y: GY - 40, range: 150 },
-  ],
+  bananas: L3B,
+  ninjas: L3N,
   items: [
     { x: L3[1].x + 65, y: L3[1].y - 40, t: 'slowmo' },
+    { x: 620, y: GY - 40, t: 'riceball' },   // a top-up before the hard part
     { x: L3[12].x + 65, y: L3[12].y - 40, t: 'bigmac' },
     { x: L3[23].x + 65, y: L3[23].y - 40, t: 'chopsticks' },
     { x: L3[8].x + 65, y: L3[8].y - 40, t: 'riceball' },
@@ -258,6 +305,17 @@ const L4arena = [
   { x: 3420, y: GY - 82, w: 150, h: 20 },
 ];
 const L4 = L4main.concat(L4arena);
+
+const L4N = [
+  guard(L4[3]), guard(L4[9]), guard(L4[15]),
+  { x: 950, y: GY - 40, range: 160 },
+  { x: 1650, y: GY - 40, range: 160 },
+  { x: 2450, y: GY - 40, range: 160 },
+];
+// bananas are generated clear of every ninja, then a few on the
+// platforms nobody is guarding
+const L4B = groundBananas(3700, L4N, 5)
+  .concat(platBananas([L4[5], L4[11], L4[17]], L4N));
 
 const LEVEL4 = {
   name: 'Temple & Cherry Blossoms',
@@ -284,18 +342,8 @@ const LEVEL4 = {
     arc(2380, GY - 40, 6, 'ramen', 230, 80),
     row(2700, GY - 40, 3, 52, 'dango')
   ),
-  bananas: [
-    { x: 620, y: GY - 34 }, { x: 1040, y: GY - 34 }, { x: 1500, y: GY - 34 },
-    { x: 2320, y: GY - 34 }, { x: 2660, y: GY - 34 },
-    { x: L4[3].x + 100, y: L4[3].y - 34 }, { x: L4[9].x + 100, y: L4[9].y - 34 },
-    { x: L4[15].x + 100, y: L4[15].y - 34 },
-  ],
-  ninjas: [
-    guard(L4[3]), guard(L4[9]), guard(L4[15]),
-    { x: 950, y: GY - 40, range: 160 },
-    { x: 1650, y: GY - 40, range: 160 },
-    { x: 2450, y: GY - 40, range: 160 },
-  ],
+  bananas: L4B,
+  ninjas: L4N,
   items: [
     { x: L4[2].x + 65, y: L4[2].y - 40, t: 'chopsticks' },
     { x: L4[11].x + 65, y: L4[11].y - 40, t: 'bigmac' },

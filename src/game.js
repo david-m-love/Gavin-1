@@ -122,7 +122,7 @@ var FF = window.FF || (window.FF = {});
     G.jeff.reset(lvl);
     G.shield.reset();
     G.pick = FF.buildPickups(spec);
-    G.ninjas = (spec.ninjas || []).map((n) => new FF.Ninja(n, spec.throwingNinjas));
+    G.ninjas = (spec.ninjas || []).map((n) => new FF.Ninja(n, spec.throwingNinjas && n.throws));
     G.thrown = [];
     G.hunger = 0;
     G.hungerTarget = FF.hungerTarget(G.pick.food);
@@ -267,7 +267,11 @@ var FF = window.FF || (window.FF = {});
       if (G.bannerT > 130) {
         const next = G.levelIndex + 1;
         if (next >= FF.LEVELS.length) { recordBest(true); G.state = 'victory'; G.bannerT = 0; }
-        else { G.jeff.grow(); loadLevel(next); recordBest(false); G.state = 'play'; }
+        else {
+          // all that food did him good — you never start a level worse than 2
+          if (G.lives < 3) G.lives++;
+          G.jeff.grow(); loadLevel(next); recordBest(false); G.state = 'play';
+        }
       }
       return;
     }
@@ -384,6 +388,11 @@ var FF = window.FF || (window.FF = {});
         burst(n.cx, n.cy, '#ffe14b', 14);
         popText(j.star > 0 ? 'SMASH!' : 'BELLY BUMP!', n.cx, n.cy - 30, '#ffd166');
         G.shake = Math.max(G.shake, 9);
+        // Landing the hit stops the charge. Otherwise the dash carried Jeff a
+        // further 128px into whatever was behind the ninja, which is what made
+        // bumping a guard feel like a trap.
+        if (j.bump > 0) { j.bump = 0; j.vx *= 0.3; }
+        if (j.invuln < 25) j.invuln = 25;
       } else {
         hurtJeff(n.cx, 'OW! -1');
       }
@@ -798,7 +807,11 @@ var FF = window.FF || (window.FF = {});
     FF.text(ctx, '🔑 KEY GET!', 0, 0, 56, '#ffd60a');
     ctx.restore();
     FF.text(ctx, 'LEVEL COMPLETE!', W / 2, H / 2 + 16, 30, '#9dffb0');
-    FF.text(ctx, 'Jeff is full — and a little bit bigger!', W / 2, H / 2 + 56, 20, '#fff');
+    if (G.lives < 3) {
+      FF.text(ctx, '❤️ +1 LIFE — all that food did him good!', W / 2, H / 2 + 56, 22, '#ff9ecb');
+    } else {
+      FF.text(ctx, 'Jeff is full — and a little bit bigger!', W / 2, H / 2 + 56, 20, '#fff');
+    }
     FF.emoji(ctx, '🍜🥤🌭', W / 2, H / 2 + 100, 40, '#ffd166');
   }
 

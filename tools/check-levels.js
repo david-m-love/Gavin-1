@@ -29,6 +29,15 @@ const constant = (name) => {
 const JUMP_V = constant('JUMP_V');
 const GRAVITY = constant('GRAVITY');
 const MAX_RUN = constant('MAX_RUN');
+const BUMP_TIME = constant('BUMP_TIME');
+const BUMP_SPEED = constant('BUMP_SPEED');
+
+// How far a belly bump carries Jeff. A banana parked inside that distance of a
+// ninja is a trap: you land the bump and skid straight into it with no way to
+// stop. Gavin hit exactly this, so it's checked now.
+let BUMP_TRAVEL = 0;
+for (let i = BUMP_TIME; i > 0; i--) BUMP_TRAVEL += BUMP_SPEED * (0.4 + i / BUMP_TIME);
+const BUMP_SAFE = BUMP_TRAVEL + 40;
 
 const PEAK = (JUMP_V * JUMP_V) / (2 * GRAVITY);   // highest rise, feet to feet
 const AIRTIME = (2 * Math.abs(JUMP_V)) / GRAVITY;
@@ -94,7 +103,20 @@ for (const lvl of LEVELS) {
     if (inside) buried.push(u);
   }
 
-  const bad = stranded.length + floating.length + buried.length;
+  // no banana within bump range of a ninja, at the same height
+  const traps = [];
+  for (const n of (lvl.ninjas || [])) {
+    const lo = n.x - n.range + 15 - BUMP_SAFE;   // ninja centre can reach n.x±range
+    const hi = n.x + n.range + 15 + BUMP_SAFE;
+    for (const b of (lvl.bananas || [])) {
+      if (Math.abs(b.y - (n.y + 20)) > 60) continue;   // different height, fine
+      if (b.x > lo && b.x < hi) {
+        traps.push({ n: n, b: b, gap: Math.round(Math.abs((n.x + 15) - b.x)) });
+      }
+    }
+  }
+
+  const bad = stranded.length + floating.length + buried.length + traps.length;
   problems += bad;
 
   console.log(
@@ -109,6 +131,10 @@ for (const lvl of LEVELS) {
       .sort((a, b) => a.rise - b.rise)[0];
     console.log('    unreachable platform x=' + p.x + ' y=' + p.y +
       (best ? '  (nearest step below needs rise ' + best.rise + 'px / across ' + Math.round(best.gap) + 'px)' : ''));
+  }
+  for (const t of traps) {
+    console.log('    banana trap: ninja x=' + t.n.x + ' y=' + t.n.y +
+      ' has a banana ' + t.gap + 'px away (bump carries Jeff ' + Math.round(BUMP_TRAVEL) + 'px)');
   }
   for (const u of floating) console.log('    floating ' + u.kind + ' at x=' + u.x + ' y=' + u.y);
   for (const u of buried) console.log('    buried ' + u.kind + ' at x=' + u.x + ' y=' + u.y);

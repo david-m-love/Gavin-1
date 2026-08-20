@@ -12,7 +12,7 @@ const CHASE_SPEED = 2.35;
 const SPOT_X = 230;
 const SPOT_Y = 70;
 
-const THROW_EVERY = 130;   // frames between throws
+const THROW_EVERY = 200;   // frames between throws
 const THROW_RANGE = 400;   // how far they'll bother throwing
 const THROW_GRAVITY = 0.34;
 
